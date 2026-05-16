@@ -71,7 +71,7 @@ model Child {
   name                 String
   dob                  DateTime @db.Date
   gender               Gender
-  parent_salary        Decimal
+  parent_salary        Decimal @db.Decimal(10,2)
   optimal_budget_cache Decimal? 
   created_at           DateTime @default(now())
   updated_at           DateTime @updatedAt
@@ -253,9 +253,9 @@ model MealPlanItem {
   meal_plan_id String
   recipe_id    Int
   day_number   Int
-  estimated_cost Decimal?
+  estimated_cost Decimal? @db.Decimal(10,2)
   meal_time    MealTime
-  match_score  Decimal
+  match_score  Decimal @db.Decimal(10,2)
 
   meal_plan    MealPlan @relation(fields: [meal_plan_id], references: [id], onDelete: Cascade)
   recipe       Recipe   @relation(fields: [recipe_id], references: [id])
