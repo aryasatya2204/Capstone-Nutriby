@@ -94,28 +94,26 @@ const getGlobalStatus = (statusWFH, statusHFA) => {
 // ==========================================
 // 4. BUDGETING (FUZZY LOGIC) & WATERLOW
 // ==========================================
-/**
- * Menghitung persentase budget optimal berdasarkan tingkat keparahan (Z-Score WFH).
- */
 const calculateDynamicBudget = (zScoreWFH, gajiOrangTua) => {
   let persentase = 0;
   
   if (zScoreWFH >= -1.9) {
-    // Zona Normal (Z-Score >= -1.9): Linear 10% - 12%
     persentase = 10 + (Math.abs(zScoreWFH) / 1.9) * (12 - 10);
   } else if (zScoreWFH < -1.9 && zScoreWFH >= -3.0) {
-    // Zona Waspada/Catch-up (-1.9 > Z-Score >= -3.0): Linear 12% - 20%
     persentase = 12 + ((Math.abs(zScoreWFH) - 1.9) / (3.0 - 1.9)) * (20 - 12);
   } else {
-    // Zona Kritis (Z-Score < -3.0): Maksimal 25% dari gaji
     persentase = 25;
   }
 
-  const optimalBudget = (persentase / 100) * parseFloat(gajiOrangTua);
+  // Hitung nilai mentah
+  const rawOptimalBudget = (persentase / 100) * parseFloat(gajiOrangTua);
+  
+  // PEMBULATAN KE RIBUAN TERDEKAT (berakhiran 000)
+  const optimalBudgetRounded = Math.round(rawOptimalBudget / 1000) * 1000;
   
   return {
     persentase_gaji: parseFloat(persentase.toFixed(1)),
-    optimal_budget: optimalBudget
+    optimal_budget: optimalBudgetRounded
   };
 };
 

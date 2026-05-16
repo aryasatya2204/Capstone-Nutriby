@@ -28,6 +28,7 @@ enum MealTime {
 enum PlanType {
   harian
   mingguan
+  Bulanan
 }
 
 enum SenderType {
@@ -71,7 +72,7 @@ model Child {
   dob                  DateTime @db.Date
   gender               Gender
   parent_salary        Decimal
-  optimal_budget_cache Decimal? // Bisa null jika belum digenerate
+  optimal_budget_cache Decimal? 
   created_at           DateTime @default(now())
   updated_at           DateTime @updatedAt
 
@@ -237,6 +238,8 @@ model MealPlan {
   child_id         String
   plan_type        PlanType
   max_budget_limit Decimal
+  actual_total_cost Decimal? @db.Decimal(10,2)
+  ai_insight_text   String?  @db.Text
   created_at       DateTime @default(now())
 
   child            Child          @relation(fields: [child_id], references: [id], onDelete: Cascade)
@@ -250,6 +253,7 @@ model MealPlanItem {
   meal_plan_id String
   recipe_id    Int
   day_number   Int
+  estimated_cost Decimal?
   meal_time    MealTime
   match_score  Decimal
 
