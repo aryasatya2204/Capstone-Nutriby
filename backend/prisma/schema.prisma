@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 // ==========================================
 // 1. ENUMS
@@ -92,23 +93,23 @@ model GrowthLog {
   child_id       String
   record_date    DateTime @db.Date
   
-  tinggi         Decimal
-  berat          Decimal
+  tinggi         Decimal @db.Decimal(10,2)
+  berat          Decimal @db.Decimal(10,2)
   
-  zscore_hfa     Decimal?
-  zscore_wfa     Decimal?
-  zscore_wfh     Decimal?
-  status_hfa     String?
-  status_wfa     String?
-  status_wfh     String?
+  zscore_hfa     Decimal? @db.Decimal(10,2)
+  zscore_wfa     Decimal? @db.Decimal(10,2)
+  zscore_wfh     Decimal? @db.Decimal(10,2)
+  status_hfa     String? 
+  status_wfa     String? 
+  status_wfh     String? 
   global_status  String?
   
-  bbi_kg         Decimal?
-  target_kalori  Decimal?
-  target_protein Decimal?
-  target_lemak   Decimal?
-  target_zinc    Decimal?
-  target_besi    Decimal?
+  bbi_kg         Decimal? @db.Decimal(10,2)
+  target_kalori  Decimal? @db.Decimal(10,2)
+  target_protein Decimal? @db.Decimal(10,2)
+  target_lemak   Decimal? @db.Decimal(10,2)
+  target_zinc    Decimal? @db.Decimal(10,2)
+  target_besi    Decimal? @db.Decimal(10,2)
   
   created_at     DateTime @default(now())
 
@@ -183,17 +184,18 @@ model Recipe {
   id             Int     @id @default(autoincrement())
   name           String
   description    String  @db.Text
+  bahan_masakan  String  @db.Text
   instructions   String  @db.Text
   min_age_months Int
   max_age_months Int
   texture        String
-  est_price      Decimal
+  est_price      Decimal @db.Decimal(10,2)
   
-  calories       Decimal
-  protein        Decimal
-  fat            Decimal
-  iron           Decimal
-  zinc           Decimal
+  calories       Decimal @db.Decimal(10,2)
+  protein        Decimal @db.Decimal(10,2)
+  fat            Decimal @db.Decimal(10,2)
+  iron           Decimal @db.Decimal(10,2)
+  zinc           Decimal @db.Decimal(10,2)
   
   tags           String?
   image_url      String?
@@ -292,17 +294,17 @@ model WhoStandard {
   id              Int     @id @default(autoincrement())
   indicator       String
   gender          Gender
-  month_or_length Decimal
-  l               Decimal
-  m               Decimal
-  s               Decimal
-  sd3neg          Decimal
-  sd2neg          Decimal
-  sd1neg          Decimal
-  sd0             Decimal
-  sd1             Decimal
-  sd2             Decimal
-  sd3             Decimal
+  month_or_length Decimal @db.Decimal(6, 1)  
+  l               Decimal @db.Decimal(10, 4) 
+  m               Decimal @db.Decimal(10, 4) 
+  s               Decimal @db.Decimal(10, 5) 
+  sd3neg          Decimal @db.Decimal(10, 2) 
+  sd2neg          Decimal @db.Decimal(10, 2)
+  sd1neg          Decimal @db.Decimal(10, 2)
+  sd0             Decimal @db.Decimal(10, 2)
+  sd1             Decimal @db.Decimal(10, 2)
+  sd2             Decimal @db.Decimal(10, 2)
+  sd3             Decimal @db.Decimal(10, 2)
 
   @@map("who_standards")
 }
@@ -316,13 +318,13 @@ model AkgStandard {
   min_age_months Int
   max_age_months Int
   
-  base_weight_kg Decimal
+  base_weight_kg Decimal @db.Decimal(10,2)
   
-  calories       Decimal
-  protein        Decimal
-  fat            Decimal
-  zinc           Decimal
-  iron           Decimal
+  calories       Decimal @db.Decimal(10,2)
+  protein        Decimal @db.Decimal(10,2)
+  fat            Decimal @db.Decimal(10,2)
+  zinc           Decimal @db.Decimal(10,2)
+  iron           Decimal @db.Decimal(10,2)
   
   created_at     DateTime @default(now())
   updated_at     DateTime @updatedAt

@@ -1,5 +1,10 @@
+require("dotenv").config(); 
+
 const express = require("express");
 const cors = require("cors");
+const authRoutes = require("./src/routes/auth.routes");
+// 1. Import route untuk data anak di sini
+const childRoutes = require("./src/routes/child.routes");
 
 const app = express();
 const PORT = 3000;
@@ -11,6 +16,10 @@ app.use(express.json());
 app.get("/", (req, res) => {
   res.send("Backend Nutriby jalan 🚀");
 });
+
+app.use("/api/auth", authRoutes);
+// 2. Gunakan route child di sini
+app.use("/api/children", childRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

@@ -3,3 +3,6 @@ node_modules
 .env
 
 /generated/prisma
+
+allergy_mapping.json
+Resep_MPASI.csv
