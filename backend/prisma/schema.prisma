@@ -36,6 +36,11 @@ enum SenderType {
   bot
 }
 
+enum BotMode {
+  reguler
+  personal
+}
+
 // ==========================================
 // 2. USERS & AUTHENTICATION
 // ==========================================
@@ -267,14 +272,17 @@ model MealPlanItem {
 // 9. NUTRI BOT
 // ==========================================
 model BotSession {
-  id         String   @id @default(uuid())
-  child_id   String
-  is_active  Boolean  @default(true)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  id            String     @id @default(uuid())
+  child_id      String
+  mode          BotMode    @default(reguler)
+  title         String?    @db.Text
+  message_count Int        @default(0)
+  is_active     Boolean    @default(true)
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @updatedAt
 
-  child      Child         @relation(fields: [child_id], references: [id], onDelete: Cascade)
-  messages   BotMessage[]
+  child         Child      @relation(fields: [child_id], references: [id], onDelete: Cascade) 
+  messages      BotMessage[]
 
   @@map("bot_sessions")
 }
