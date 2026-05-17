@@ -5,6 +5,8 @@ const cors = require("cors");
 const authRoutes = require("./src/routes/auth.routes");
 const childRoutes = require("./src/routes/child.routes");
 const mealplanRoutes = require("./src/routes/mealplan.routes");
+const mpasiRoutes = require("./src/routes/mpasi.routes");
+const growthRoutes = require("./src/routes/growth.routes"); // <-- 1. Import file baru
 
 const app = express();
 const PORT = 3000;
@@ -18,9 +20,10 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
-// 2. Gunakan route child di sini
 app.use("/api/children", childRoutes);
-app.use("/api/mealplans", mealplanRoutes);
+app.use("/api/mealplans", mealplanRoutes); 
+app.use("/api/mpasi", mpasiRoutes);       
+app.use("/api/growth", growthRoutes);     // <-- 2. Daftarkan route growth
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
