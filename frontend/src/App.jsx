@@ -12,6 +12,12 @@ function PrivateRoute({ children }) {
 function Dashboard() {
   return <div style={{ padding: 40 }}>Dashboard (coming soon)</div>;
 }
+import Dashboard from "./pages/dashboard";
+
+function PrivateRoute({ children }) {
+  const { user } = useAuth();
+  return user ? children : <Navigate to="/" replace />;
+}
 
 function App() {
   return (

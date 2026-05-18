@@ -1,0 +1,21 @@
+# =========================
+# AI / PYTHON ARTIFACTS
+# =========================
+
+# Mengabaikan folder cache Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Mengabaikan file model AI dan preprocessor (Biner)
+ai/models/*.keras
+ai/models/*.pkl
+ai/models/*.h5
+
+# (Opsional) Mengabaikan virtual environment Python jika Anda membuatnya di dalam folder ini
+venv/
+env/
+.venv/
+
+# (Penting) Mengabaikan file environment variables!
+.env

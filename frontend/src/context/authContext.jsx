@@ -20,7 +20,10 @@ export function AuthProvider({ children }) {
   );
 }
 
+<<<<<<< HEAD
 // Hook custom biar gampang dipanggil: const { user } = useAuth()
+=======
+>>>>>>> 0ea794a968e2d2b45a3c75475be6110e030c8741
 export function useAuth() {
   return useContext(AuthContext);
 }

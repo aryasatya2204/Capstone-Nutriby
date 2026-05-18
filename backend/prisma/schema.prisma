@@ -1,0 +1,345 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+// ==========================================
+// 1. ENUMS
+// ==========================================
+enum AuthProvider {
+  manual
+  google
+}
+
+enum Gender {
+  L
+  P
+}
+
+enum MealTime {
+  pagi
+  siang
+  malam
+}
+
+enum PlanType {
+  harian
+  mingguan
+  Bulanan
+}
+
+enum SenderType {
+  user
+  bot
+}
+
+enum BotMode {
+  reguler
+  personal
+}
+
+// ==========================================
+// 2. USERS & AUTHENTICATION
+// ==========================================
+model User {
+  id            String       @id @default(uuid())
+  name          String
+  email         String       @unique
+  password      String?
+  auth_provider AuthProvider @default(manual)
+  provider_id   String?      @unique
+  created_at    DateTime     @default(now())
+  updated_at    DateTime     @updatedAt
+
+  children      Child[]
+
+  @@map("users")
+}
+
+model PasswordReset {
+  email      String   @id // Menjadikan email sebagai identifier
+  token      String
+  created_at DateTime @default(now())
+
+  @@map("password_resets")
+}
+
+// ==========================================
+// 3. CHILDREN & PROFILES
+// ==========================================
+model Child {
+  id                   String   @id @default(uuid())
+  user_id              String
+  name                 String
+  dob                  DateTime @db.Date
+  gender               Gender
+  parent_salary        Decimal @db.Decimal(10,2)
+  optimal_budget_cache Decimal? 
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  user                 User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  growth_logs          GrowthLog[]
+  allergies            ChildAllergy[]
+  preferences          ChildPreference[]
+  meal_plans           MealPlan[]
+  bot_sessions         BotSession[]
+
+  @@map("children")
+}
+
+// ==========================================
+// 4. GROWTH TRACKER
+// ==========================================
+model GrowthLog {
+  id             String   @id @default(uuid())
+  child_id       String
+  record_date    DateTime @db.Date
+  
+  tinggi         Decimal @db.Decimal(10,2)
+  berat          Decimal @db.Decimal(10,2)
+  
+  zscore_hfa     Decimal? @db.Decimal(10,2)
+  zscore_wfa     Decimal? @db.Decimal(10,2)
+  zscore_wfh     Decimal? @db.Decimal(10,2)
+  status_hfa     String? 
+  status_wfa     String? 
+  status_wfh     String? 
+  global_status  String?
+  
+  bbi_kg         Decimal? @db.Decimal(10,2)
+  target_kalori  Decimal? @db.Decimal(10,2)
+  target_protein Decimal? @db.Decimal(10,2)
+  target_lemak   Decimal? @db.Decimal(10,2)
+  target_zinc    Decimal? @db.Decimal(10,2)
+  target_besi    Decimal? @db.Decimal(10,2)
+  
+  created_at     DateTime @default(now())
+
+  child          Child    @relation(fields: [child_id], references: [id], onDelete: Cascade)
+
+  @@map("growth_logs")
+}
+
+// ==========================================
+// 5. MASTER DATA (STATIS)
+// ==========================================
+model AllergyCategory {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+
+  items            AllergyItem[]
+  child_allergies  ChildAllergy[]
+  recipe_allergies RecipeAllergy[]
+
+  @@map("allergy_categories")
+}
+
+model AllergyItem {
+  id          Int    @id @default(autoincrement())
+  category_id Int
+  item_name   String @unique
+
+  category    AllergyCategory @relation(fields: [category_id], references: [id], onDelete: Cascade)
+
+  @@map("allergy_items")
+}
+
+model Ingredient {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+
+  child_preferences  ChildPreference[]
+  recipe_ingredients RecipeIngredient[]
+
+  @@map("ingredients")
+}
+
+// ==========================================
+// 6. PREFERENCES & ALLERGIES (ANAK)
+// ==========================================
+model ChildAllergy {
+  child_id            String
+  allergy_category_id Int
+
+  child               Child           @relation(fields: [child_id], references: [id], onDelete: Cascade)
+  allergy_category    AllergyCategory @relation(fields: [allergy_category_id], references: [id], onDelete: Cascade)
+
+  @@id([child_id, allergy_category_id])
+  @@map("child_allergies")
+}
+
+model ChildPreference {
+  child_id      String
+  ingredient_id Int
+
+  child         Child      @relation(fields: [child_id], references: [id], onDelete: Cascade)
+  ingredient    Ingredient @relation(fields: [ingredient_id], references: [id], onDelete: Cascade)
+
+  @@id([child_id, ingredient_id])
+  @@map("child_preferences")
+}
+
+// ==========================================
+// 7. RECIPES
+// ==========================================
+model Recipe {
+  id             Int     @id @default(autoincrement())
+  name           String
+  description    String  @db.Text
+  bahan_masakan  String  @db.Text
+  instructions   String  @db.Text
+  min_age_months Int
+  max_age_months Int
+  texture        String
+  est_price      Decimal @db.Decimal(10,2)
+  
+  calories       Decimal @db.Decimal(10,2)
+  protein        Decimal @db.Decimal(10,2)
+  fat            Decimal @db.Decimal(10,2)
+  iron           Decimal @db.Decimal(10,2)
+  zinc           Decimal @db.Decimal(10,2)
+  
+  tags           String?
+  image_url      String?
+
+  ingredients    RecipeIngredient[]
+  allergies      RecipeAllergy[]
+  meal_plan_items MealPlanItem[]
+
+  @@map("recipes")
+}
+
+model RecipeIngredient {
+  recipe_id     Int
+  ingredient_id Int
+
+  recipe        Recipe     @relation(fields: [recipe_id], references: [id], onDelete: Cascade)
+  ingredient    Ingredient @relation(fields: [ingredient_id], references: [id], onDelete: Cascade)
+
+  @@id([recipe_id, ingredient_id])
+  @@map("recipe_ingredients")
+}
+
+model RecipeAllergy {
+  recipe_id           Int
+  allergy_category_id Int
+
+  recipe              Recipe          @relation(fields: [recipe_id], references: [id], onDelete: Cascade)
+  allergy_category    AllergyCategory @relation(fields: [allergy_category_id], references: [id], onDelete: Cascade)
+
+  @@id([recipe_id, allergy_category_id])
+  @@map("recipe_allergies")
+}
+
+// ==========================================
+// 8. MEAL PLANS
+// ==========================================
+model MealPlan {
+  id               String   @id @default(uuid())
+  child_id         String
+  plan_type        PlanType
+  max_budget_limit Decimal
+  actual_total_cost Decimal? @db.Decimal(10,2)
+  ai_insight_text   String?  @db.Text
+  created_at       DateTime @default(now())
+
+  child            Child          @relation(fields: [child_id], references: [id], onDelete: Cascade)
+  items            MealPlanItem[]
+
+  @@map("meal_plans")
+}
+
+model MealPlanItem {
+  id           String   @id @default(uuid())
+  meal_plan_id String
+  recipe_id    Int
+  day_number   Int
+  estimated_cost Decimal? @db.Decimal(10,2)
+  meal_time    MealTime
+  match_score  Decimal @db.Decimal(10,2)
+
+  meal_plan    MealPlan @relation(fields: [meal_plan_id], references: [id], onDelete: Cascade)
+  recipe       Recipe   @relation(fields: [recipe_id], references: [id])
+
+  @@map("meal_plan_items")
+}
+
+// ==========================================
+// 9. NUTRI BOT
+// ==========================================
+model BotSession {
+  id            String     @id @default(uuid())
+  child_id      String
+  mode          BotMode    @default(reguler)
+  title         String?    @db.Text
+  message_count Int        @default(0)
+  is_active     Boolean    @default(true)
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @updatedAt
+
+  child         Child      @relation(fields: [child_id], references: [id], onDelete: Cascade) 
+  messages      BotMessage[]
+
+  @@map("bot_sessions")
+}
+
+model BotMessage {
+  id         String     @id @default(uuid())
+  session_id String
+  sender     SenderType
+  message    String     @db.Text
+  created_at DateTime   @default(now())
+
+  session    BotSession @relation(fields: [session_id], references: [id], onDelete: Cascade)
+
+  @@map("bot_messages")
+}
+
+// ==========================================
+// 10. WHO STANDARDS
+// ==========================================
+model WhoStandard {
+  id              Int     @id @default(autoincrement())
+  indicator       String
+  gender          Gender
+  month_or_length Decimal @db.Decimal(6, 1)  
+  l               Decimal @db.Decimal(10, 4) 
+  m               Decimal @db.Decimal(10, 4) 
+  s               Decimal @db.Decimal(10, 5) 
+  sd3neg          Decimal @db.Decimal(10, 2) 
+  sd2neg          Decimal @db.Decimal(10, 2)
+  sd1neg          Decimal @db.Decimal(10, 2)
+  sd0             Decimal @db.Decimal(10, 2)
+  sd1             Decimal @db.Decimal(10, 2)
+  sd2             Decimal @db.Decimal(10, 2)
+  sd3             Decimal @db.Decimal(10, 2)
+
+  @@map("who_standards")
+}
+
+// ==========================================
+// 11. AKG STANDARDS
+// ==========================================
+model AkgStandard {
+  id             Int      @id @default(autoincrement())
+  gender         Gender
+  min_age_months Int
+  max_age_months Int
+  
+  base_weight_kg Decimal @db.Decimal(10,2)
+  
+  calories       Decimal @db.Decimal(10,2)
+  protein        Decimal @db.Decimal(10,2)
+  fat            Decimal @db.Decimal(10,2)
+  zinc           Decimal @db.Decimal(10,2)
+  iron           Decimal @db.Decimal(10,2)
+  
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  @@map("akg_standards")
+}
