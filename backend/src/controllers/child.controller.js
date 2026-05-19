@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { Pool } = require('pg');
+const { executeMealPlanAI } = require('../services/mealplan.service.js');
 
 // Mengimpor fungsi pembantu dari growth.helper.js
 const { 
@@ -24,17 +25,15 @@ const createChild = async (req, res) => {
     const { 
       name, dob, gender, parent_salary, 
       tinggi, berat, 
-      allergy_ids,     // Array angka, misal: [1, 2]
-      preference_ids   // Array angka, misal: [5]
+      allergy_ids,
+      preference_ids
     } = req.body;
     
     const userId = req.user.id;
     const beratAktual = parseFloat(berat);
     const tinggiAktual = parseFloat(tinggi);
 
-    // ==========================================
     // 1. VALIDASI ALERGI VS MAKANAN KESUKAAN
-    // ==========================================
     if (allergy_ids && allergy_ids.length > 0 && preference_ids && preference_ids.length > 0) {
       const allergies = await prisma.allergyCategory.findMany({
         where: { id: { in: allergy_ids } }
@@ -57,15 +56,10 @@ const createChild = async (req, res) => {
       }
     }
 
-    // ==========================================
-    // 2. HITUNG UMUR & TARIK DATA MASTER (WHO & AKG)
-    // ==========================================
+    // 2. HITUNG UMUR & TARIK DATA MASTER
     const ageInMonths = getAgeInMonths(dob);
-    
-    // Pembulatan tinggi ke kelipatan 0.5 terdekat untuk mencocokkan standar tabel WFH WHO
     const tinggiRounded = Math.round(tinggiAktual * 2) / 2;
 
-    // Mengambil 4 data master sekaligus secara paralel agar cepat
     const [whoWFA, whoHFA, whoWFH, akgData] = await Promise.all([
       prisma.whoStandard.findFirst({ where: { indicator: 'WFA', gender, month_or_length: ageInMonths } }),
       prisma.whoStandard.findFirst({ where: { indicator: 'HFA', gender, month_or_length: ageInMonths } }),
@@ -75,56 +69,36 @@ const createChild = async (req, res) => {
       })
     ]);
 
-    // Jika database master belum diisi data yang cocok, hentikan proses
     if (!whoWFA || !whoHFA || !whoWFH || !akgData) {
-      return res.status(404).json({ 
-        message: "Gagal mengkalkulasi. Data Standar WHO atau AKG untuk rentang umur/tinggi ini belum tersedia di database." 
-      });
+      return res.status(404).json({ message: "Gagal mengkalkulasi. Data Standar WHO atau AKG belum tersedia." });
     }
 
-    // ==========================================
-    // 3. KALKULASI Z-SCORE, STATUS & BUDGET
-    // ==========================================
-    const idealWeight = parseFloat(whoWFH.m); // Nilai Median dari tabel WFH sebagai BBI
-    
-    // Hitung Z-Score LMS
+    // 3. KALKULASI Z-SCORE & BUDGET
+    const idealWeight = parseFloat(whoWFH.m); 
     const zscoreWFA = calculateLMS(beratAktual, whoWFA.l, whoWFA.m, whoWFA.s);
     const zscoreHFA = calculateLMS(tinggiAktual, whoHFA.l, whoHFA.m, whoHFA.s);
     const zscoreWFH = calculateLMS(beratAktual, whoWFH.l, whoWFH.m, whoWFH.s);
 
-    // Ambil Status
     const statusWFA = getStatusWFA(zscoreWFA);
     const statusHFA = getStatusHFA(zscoreHFA);
     const statusWFH = getStatusWFH(zscoreWFH);
     const globalStatus = getGlobalStatus(statusWFH, statusHFA);
 
-    // Hitung Budget (Fuzzy Logic)
     const budgetInfo = calculateDynamicBudget(zscoreWFH, parent_salary);
 
-    // ==========================================
-    // 4. KALKULASI KEBUTUHAN GIZI (AKG, BBI & WATERLOW)
-    // ==========================================
+    // 4. KALKULASI KEBUTUHAN GIZI
     const akgBaseWeight = parseFloat(akgData.base_weight_kg);
-
-    // Kebutuhan dasar per Kg (diambil dari tabel AKG)
     const kkalPerKg = parseFloat(akgData.calories) / akgBaseWeight;
     const proteinPerKg = parseFloat(akgData.protein) / akgBaseWeight;
     const lemakPerKg = parseFloat(akgData.fat) / akgBaseWeight;
 
-    // 1. Kalori (Menggunakan Waterlow Catch-up jika WFH < -2.0, jika normal pakai BBI)
     const targetKalori = calculateWaterlowCalories(zscoreWFH, beratAktual, idealWeight, kkalPerKg);
-
-    // 2. Makro Nutrien (Protein & Lemak) dihitung menggunakan BBI secara keseluruhan
     const targetProtein = proteinPerKg * idealWeight;
     const targetLemak = lemakPerKg * idealWeight;
-
-    // 3. Mikro Nutrien (Zinc & Iron) langsung mengambil nilai mutlak dari tabel AKG
     const targetZinc = parseFloat(akgData.zinc);
     const targetBesi = parseFloat(akgData.iron);
 
-    // ==========================================
-    // 5. SIMPAN KE DATABASE (TRANSACTION)
-    // ==========================================
+    // 5. SIMPAN KE DATABASE
     const result = await prisma.$transaction(async (tx) => {
       const child = await tx.child.create({
         data: {
@@ -133,15 +107,10 @@ const createChild = async (req, res) => {
           dob: new Date(dob),
           gender, 
           parent_salary: parseFloat(parent_salary),
-          optimal_budget_cache: budgetInfo.optimal_budget, // Update cache budget
+          optimal_budget_cache: budgetInfo.optimal_budget, 
           
-          preferences: { 
-            create: preference_ids ? preference_ids.map(id => ({ ingredient_id: id })) : []
-          },
-          
-          allergies: {
-            create: allergy_ids ? allergy_ids.map(id => ({ allergy_category_id: id })) : []
-          },
+          preferences: { create: preference_ids ? preference_ids.map(id => ({ ingredient_id: id })) : [] },
+          allergies: { create: allergy_ids ? allergy_ids.map(id => ({ allergy_category_id: id })) : [] },
 
           growth_logs: {
             create: {
@@ -149,19 +118,12 @@ const createChild = async (req, res) => {
               tinggi: tinggiAktual,
               berat: beratAktual,
               bbi_kg: idealWeight,
-              
-              // Status & Z-Score
               zscore_wfa: zscoreWFA, status_wfa: statusWFA,
               zscore_hfa: zscoreHFA, status_hfa: statusHFA,
               zscore_wfh: zscoreWFH, status_wfh: statusWFH,
               global_status: globalStatus,
-              
-              // Kebutuhan Gizi
-              target_kalori: targetKalori,
-              target_protein: targetProtein,
-              target_lemak: targetLemak,
-              target_zinc: targetZinc,
-              target_besi: targetBesi
+              target_kalori: targetKalori, target_protein: targetProtein,
+              target_lemak: targetLemak, target_zinc: targetZinc, target_besi: targetBesi
             }
           }
         },
@@ -191,13 +153,12 @@ const getChildren = async (req, res) => {
   try {
     const children = await prisma.child.findMany({
       where: { user_id: req.user.id },
+      orderBy: { id: 'desc' }, 
       include: { 
-        growth_logs: {
-          orderBy: { record_date: 'desc' },
-          take: 1
-        }, 
+        growth_logs: { orderBy: { record_date: 'desc' }, take: 1 }, 
         allergies: { include: { allergy_category: true } }, 
-        preferences: { include: { ingredient: true } } 
+        preferences: { include: { ingredient: true } },
+        meal_plans: { orderBy: { id: 'desc' } } 
       }
     });
     res.status(200).json(children);
@@ -206,4 +167,87 @@ const getChildren = async (req, res) => {
   }
 };
 
-module.exports = { createChild, getChildren };
+const updateChild = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { allergy_ids, preference_ids, parent_salary } = req.body;
+
+    // 1. Validasi Silang Alergi & Preferensi
+    if (allergy_ids && allergy_ids.length > 0 && preference_ids && preference_ids.length > 0) {
+      const allergies = await prisma.allergyCategory.findMany({ where: { id: { in: allergy_ids } } });
+      const preferences = await prisma.ingredient.findMany({ where: { id: { in: preference_ids } } });
+
+      for (const pref of preferences) {
+        const prefNameLower = pref.name.toLowerCase();
+        const clash = allergies.find(al => prefNameLower.includes(al.name.toLowerCase()));
+        
+        if (clash) {
+          return res.status(400).json({ 
+            message: "Validasi Gagal: Data kontradiktif!", 
+            details: `Anak alergi terhadap '${clash.name}', '${pref.name}' dilarang.`
+          });
+        }
+      }
+    }
+
+    // 2. Ambil Z-Score WFH Terakhir (Untuk kalkulasi budget ulang jika gaji diubah)
+    const existingChild = await prisma.child.findUnique({
+      where: { id },
+      include: { growth_logs: { orderBy: { record_date: 'desc' }, take: 1 } }
+    });
+
+    if (!existingChild) return res.status(404).json({ message: "Data anak tidak ditemukan" });
+
+    let finalSalary = existingChild.parent_salary;
+    let finalBudget = existingChild.optimal_budget_cache;
+
+    // Jika user menginput gaji baru, hitung ulang batasan anggarannya
+    if (parent_salary !== undefined) {
+      finalSalary = parseFloat(parent_salary);
+      const latestLog = existingChild.growth_logs[0];
+      const zscoreWFH = latestLog ? parseFloat(latestLog.zscore_wfh) : 0;
+      
+      const newBudgetInfo = calculateDynamicBudget(zscoreWFH, finalSalary);
+      finalBudget = newBudgetInfo.optimal_budget;
+    }
+
+    // 3. Transaksi Update (Hapus yang lama, insert yang baru + update gaji)
+    const updatedChild = await prisma.$transaction(async (tx) => {
+      await tx.childAllergy.deleteMany({ where: { child_id: id } });
+      await tx.childPreference.deleteMany({ where: { child_id: id } });
+
+      return await tx.child.update({
+        where: { id },
+        data: {
+          parent_salary: finalSalary,
+          optimal_budget_cache: finalBudget,
+          allergies: { create: allergy_ids ? allergy_ids.map(aId => ({ allergy_category_id: aId })) : [] },
+          preferences: { create: preference_ids ? preference_ids.map(pId => ({ ingredient_id: pId })) : [] }
+        },
+        include: { 
+          allergies: { include: { allergy_category: true } }, 
+          preferences: { include: { ingredient: true } },
+          growth_logs: { orderBy: { record_date: 'desc' }, take: 1 },
+          meal_plans: { orderBy: { id: 'desc' } }
+        }
+      });
+    });
+
+    // === LOGIKA CONDITION: HANYA HIT MODEL AI JIKA USER MENGUBAH GAJI ===
+    if (parent_salary !== undefined) {
+      try {
+        // Memicu regenerasi mealplan & AI insight finansial baru
+        await executeMealPlanAI(id, true);
+      } catch (aiError) {
+        console.error("⚠️ Gagal update AI Mealplan setelah perubahan gaji:", aiError.message);
+        // Proses tetap dilanjutkan karena data dasar anak di DB sudah sukses tersimpan
+      }
+    }
+
+    res.status(200).json({ message: "Data berhasil diperbarui!", data: updatedChild });
+  } catch (error) {
+    res.status(500).json({ message: "Gagal memperbarui data", error: error.message });
+  }
+};
+
+module.exports = { createChild, getChildren, updateChild };

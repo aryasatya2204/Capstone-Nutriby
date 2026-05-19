@@ -78,6 +78,8 @@ model Child {
   gender               Gender
   parent_salary        Decimal @db.Decimal(10,2)
   optimal_budget_cache Decimal? 
+  daily_insight_text   String?  @db.Text
+  last_insight_date    DateTime? @db.Date
   created_at           DateTime @default(now())
   updated_at           DateTime @updatedAt
 

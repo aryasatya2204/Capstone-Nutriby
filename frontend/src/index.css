@@ -9,14 +9,8 @@
   --color-text-muted: #eae7e7;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
 @layer base {
   body {
-    font-family: "Lato",;
+    font-family: "Lato";
   }
 }
