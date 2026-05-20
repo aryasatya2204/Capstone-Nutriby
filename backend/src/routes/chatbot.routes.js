@@ -13,5 +13,6 @@ router.post("/chat", authMiddleware, chatbotController.sendMessage);
 
 // 3. Lihat Riwayat Sesi berdasarkan Profil Anak
 router.get("/sessions/:child_id", authMiddleware, chatbotController.getSessions);
+router.get("/session/:session_id/messages", authMiddleware, chatbotController.getSessionMessages);
 
 module.exports = router;
