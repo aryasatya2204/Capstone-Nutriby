@@ -17,7 +17,6 @@ import step1Img from "../assets/landingPage/step1Img.jpeg";
 import step2Img from "../assets/landingPage/step2Img.jpeg";
 import step3Img from "../assets/landingPage/step3Img.jpeg";
 import step4Img from "../assets/landingPage/step4Img.jpeg";
-import fotoKeluarga from "../assets/landingPage/fotoKeluarga.png";
 
 const tantanganData = [
   {
@@ -215,17 +214,13 @@ function LandingPage() {
             </p>
           </div>
           <div className="flex h-[160px] w-[160px] items-center justify-center rounded-xl bg-gray-200/50 md:h-[200px] md:w-[200px]">
-            <img
-              src={fotoKeluarga}
-              alt="Animasi keluarga"
-              className="mb-3 h-20 w-auto object-contain md:mb-4 md:h-24"
-            />
+            <span className="text-sm text-gray-400">Gambar Keluarga</span>
           </div>
         </div>
       </section>
 
       {/* ── CALL TO ACTION ── */}
-      <section className="mt-16 px-4 text-center pb-32 md:mt-24 md:px-6">
+      <section className="my-16 px-4 text-center md:my-24 md:px-6">
         <h2 className="mx-auto mb-3 max-w-[600px] text-[22px] font-bold leading-snug text-[#8B1E1E] md:mb-4 md:text-[28px]">
           Mulai Langkah Terbaik untuk Tumbuh Kembang Anak Anda
         </h2>

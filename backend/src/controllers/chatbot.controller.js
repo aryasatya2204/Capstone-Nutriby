@@ -164,4 +164,17 @@ const getSessions = async (req, res) => {
   }
 };
 
-module.exports = { createSession, sendMessage, getSessions };
+const getSessionMessages = async (req, res) => {
+  try {
+    const { session_id } = req.params;
+    const messages = await prisma.botMessage.findMany({
+      where: { session_id },
+      orderBy: { created_at: 'asc' }
+    });
+    res.status(200).json(messages);
+  } catch (error) {
+    res.status(500).json({ message: "Gagal memuat pesan", error: error.message });
+  }
+};
+
+module.exports = { createSession, sendMessage, getSessions, getSessionMessages };
