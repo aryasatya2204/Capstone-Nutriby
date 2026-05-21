@@ -107,9 +107,7 @@ const addWeeklyGrowthLog = async (req, res) => {
     const currentWeight = parseFloat(weight);
     const currentHeight = parseFloat(height);
 
-    // --------------------------------------------------------------------------
     // A. TARIK DATA STANDAR WHO DARI DATABASE
-    // --------------------------------------------------------------------------
     const whoWFA = await prisma.whoStandard.findFirst({
       where: { indicator: "WFA", gender: child.gender, month_or_length: ageInMonths }
     });
@@ -118,15 +116,12 @@ const addWeeklyGrowthLog = async (req, res) => {
       where: { indicator: "HFA", gender: child.gender, month_or_length: ageInMonths }
     });
 
-    // Pembulatan tinggi badan ke 0.5 terdekat untuk mencocokkan standar tabel WFH WHO
     const heightRounded = Math.round(currentHeight * 2) / 2;
     const whoWFH = await prisma.whoStandard.findFirst({
       where: { indicator: "WFH", gender: child.gender, month_or_length: heightRounded }
     });
 
-    // --------------------------------------------------------------------------
     // B. KALKULASI Z-SCORE & STATUS GIZI
-    // --------------------------------------------------------------------------
     const zscore_wfa_calc = whoWFA ? calculateLMS(currentWeight, whoWFA.l, whoWFA.m, whoWFA.s) : null;
     const zscore_hfa_calc = whoHFA ? calculateLMS(currentHeight, whoHFA.l, whoHFA.m, whoHFA.s) : null;
     const zscore_wfh_calc = whoWFH ? calculateLMS(currentWeight, whoWFH.l, whoWFH.m, whoWFH.s) : null;
@@ -139,9 +134,7 @@ const addWeeklyGrowthLog = async (req, res) => {
       ? getGlobalStatus(status_wfh, status_hfa) 
       : "Data Tidak Lengkap";
 
-    // --------------------------------------------------------------------------
     // C. TARIK DATA STANDAR AKG & KALKULASI WATERLOW
-    // --------------------------------------------------------------------------
     const akg = await prisma.akgStandard.findFirst({
       where: {
         gender: child.gender,
@@ -156,24 +149,20 @@ const addWeeklyGrowthLog = async (req, res) => {
     let target_besi = null;
     let target_zinc = null;
     
-    // Berat Badan Ideal (BBI) diambil dari Median (m) standar WFA WHO
     const bbi_kg = whoWFA ? parseFloat(whoWFA.m) : currentWeight;
 
     if (akg) {
-      // Hitung Kalori Catch-up (Waterlow)
       const kkalPerKg = parseFloat(akg.calories) / parseFloat(akg.base_weight_kg);
+      // Menggunakan fungsi Waterlow baru yang sudah bebas dari bug nilai defisit
       target_kalori = calculateWaterlowCalories(zscore_wfh_calc || 0, currentWeight, bbi_kg, kkalPerKg);
       
-      // Ambil target nutrisi lainnya langsung dari standar AKG
       target_protein = parseFloat(akg.protein);
       target_lemak = parseFloat(akg.fat);
       target_besi = parseFloat(akg.iron);
       target_zinc = parseFloat(akg.zinc);
     }
 
-    // --------------------------------------------------------------------------
-    // D. SIMPAN KE DATABASE (Sesuai dengan schema.prisma)
-    // --------------------------------------------------------------------------
+    // D. SIMPAN KE DATABASE
     const newLog = await prisma.growthLog.create({
       data: {
         child_id: childId,
@@ -195,6 +184,14 @@ const addWeeklyGrowthLog = async (req, res) => {
         record_date: new Date()
       }
     });
+
+    // === LOGIKA WAJIB HIT BARU: RE-GENERATE DI BACKGROUND SAAT ADA PERTUMBUHAN BARU ===
+    try {
+      // Mengirim flag isUpdate = true agar prompt Gemini menyesuaikan evaluasi berkala
+      await executeMealPlanAI(childId, true);
+    } catch (aiError) {
+      console.error("⚠️ Gagal memperbarui AI Insight terintegrasi setelah log pertumbuhan:", aiError.message);
+    }
 
     res.status(201).json({
       message: "Data pertumbuhan mingguan berhasil dicatat beserta analisis gizinya!",

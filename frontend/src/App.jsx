@@ -1,41 +1,33 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "./context/authContext";
+import { Routes, Route } from "react-router-dom";
 import LandingPage from "./pages/landingPage";
-import "./App.css";
-import Dashboard from "./pages/dasboard";
-
-function PrivateRoute({ children }) {
-  const { user } = useAuth();
-  return user ? children : <Navigate to="/" replace />;
-}
-
-function Dashboard() {
-  return <div style={{ padding: 40 }}>Dashboard (coming soon)</div>;
-}
 import Dashboard from "./pages/dashboard";
-
-function PrivateRoute({ children }) {
-  const { user } = useAuth();
-  return user ? children : <Navigate to="/" replace />;
-}
+import Profile from "./pages/Profile";
+import ProtectedRoute from "./components/ProtectedRoute";
+import Information from "./pages/Information";
+import Features from "./pages/Features";
+import WeeklyPlan from "./pages/Features/WeeklyPlan";
+import SearchMenu from "./pages/Features/SearchMenu";
+import Nutribot from "./pages/Features/Nutribot";
+import GrowthTracker from "./pages/Features/GrowthTracker";
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route
-            path="/dashboard"
-            element={
-              <PrivateRoute>
-                <Dashboard />
-              </PrivateRoute>
-            }
-          />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <Routes>
+      {/* Landing Page sebagai halaman utama (semua pop-up menempel di sini) */}
+      <Route path="/" element={<LandingPage />} />
+
+      {/* Rute Terlindungi (Hanya Dashboard) */}
+      <Route element={<ProtectedRoute />}>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/information" element={<Information />} />
+        <Route path="/features" element={<Features />} />
+        <Route path="/features/weekly-plan" element={<WeeklyPlan />} />
+        <Route path="/features/search-menu" element={<SearchMenu />} />
+        <Route path="/features/nutribot" element={<Nutribot />} />
+        <Route path="/features/growth-tracker" element={<GrowthTracker />} />
+      </Route>
+    </Routes>
   );
 }
 

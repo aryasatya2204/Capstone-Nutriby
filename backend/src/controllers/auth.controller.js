@@ -16,7 +16,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'rahasia_nutriby_super_aman_123';
 // --- LOGIN VIA GOOGLE ---
 const googleLogin = async (req, res) => {
   try {
-    const { idToken } = req.body; // Token dari Frontend
+    const { idToken } = req.body;
 
     const ticket = await googleClient.verifyIdToken({
       idToken,
@@ -25,7 +25,6 @@ const googleLogin = async (req, res) => {
     const payload = ticket.getPayload();
     const { email, name, sub: provider_id } = payload;
 
-    // Cari atau Buat User Baru (Upsert)
     let user = await prisma.user.findUnique({ where: { email } });
 
     if (!user) {
@@ -52,7 +51,7 @@ const googleLogin = async (req, res) => {
 };
 
 // ==========================================
-// 1. REGISTRASI MANUAL
+// 1. REGISTRASI MANUAL (DIPERBARUI: RETURN TOKEN)
 // ==========================================
 const registerManual = async (req, res) => {
   try {
@@ -74,8 +73,15 @@ const registerManual = async (req, res) => {
       }
     });
 
+    const token = jwt.sign(
+      { id: newUser.id, email: newUser.email },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
     res.status(201).json({
       message: "Registrasi berhasil!",
+      token,
       user: { id: newUser.id, name: newUser.name, email: newUser.email }
     });
   } catch (error) {
@@ -120,5 +126,17 @@ const loginManual = async (req, res) => {
   }
 };
 
-// BAGIAN INI YANG KEMUNGKINAN HILANG SEBELUMNYA 👇
-module.exports = { registerManual, loginManual, googleLogin };
+// ==========================================
+// 3. LOGOUT (BARU)
+// ==========================================
+const logout = async (req, res) => {
+  try {
+    res.status(200).json({ 
+      message: "Logout berhasil! Silakan hapus token Anda dari aplikasi klien." 
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error saat logout", error: error.message });
+  }
+};
+
+module.exports = { registerManual, loginManual, googleLogin, logout };

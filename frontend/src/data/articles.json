@@ -1,0 +1,66 @@
+{
+  "featuredArticle": {
+    "id": 1,
+    "image": "https://images.unsplash.com/photo-1555252333-9f8e92e65df9?w=400&q=80",
+    "tag": "ASI",
+    "title": "Manfaat Alpukat Bagi Kelancaran ASI",
+    "excerpt": "Pelajari mengapa alpukat berperan penting dalam kelancaran ASI. Selain itu pelajari mengapa ASI menjadi sumber nutrisi paling penting dalam 6 bulan pertama bayi.",
+    "readTime": "5 menit baca",
+    "url": "https://www.alodokter.com/manfaat-alpukat-untuk-ibu-menyusui"
+  },
+
+  "dailyQuote": {
+    "label": "Kata-kata hari ini",
+    "text": "Sabar adalah kunci saat mengenalkan rasa baru ke buah hati.",
+    "cta": "Tips lainnya >>",
+    "url": "#"
+  },
+
+  "latestArticles": [
+    {
+      "id": 2,
+      "image": "https://images.alodokter.com/dk0z4ums3/image/upload/v1618205979/attached_image/mpasi-diberikan-setelah-bayi-berusia-6-bulan-0-alodokter.jpg",
+      "tag": "MPASI",
+      "title": "MPASI Bayi 6 Bulan, Ini Panduan Pemberiannya",
+      "excerpt": "MPASI bayi 6 bulan merupakan tahap penting ketika Si Kecil mulai mendapatkan makanan pendamping selain ASI. Pada fase ini, ada beberapa hal dan aturan pemberian MPASI",
+      "readTime": "5 menit baca",
+      "url": "https://www.alodokter.com/mpasi-diberikan-setelah-bayi-berusia-6-bulan"
+    },
+    {
+      "id": 3,
+      "image": "https://d24eqpince6acm.cloudfront.net/articles/jadwal-makan-bayi-6-bulan-mpasi-dalam-sehari-bebeclub_2.webp",
+      "tag": "MPASI",
+      "title": "MPASI Bayi 6 Bulan: Panduan Porsi, Jadwal, Tips, dan Menunya",
+      "excerpt": "MPASI bayi 6 bulan dimulai dari tekstur bubur saring lembut dengan porsi 2-3 sendok makan untuk sekali makan. Cari tahu pilihan makanan dan tips memulainya!",
+      "readTime": "5 menit baca",
+      "url": "https://bebeclub.co.id/artikel/nutrisi/4-6-bulan/jadwal-makan-bayi-6-bulan-mpasi-dalam-sehari?utm_source=google&utm_medium=cpc&utm_campaign=bebelac-sem-genericaurora-aon-consideration-traffic_May-2026&utm_term=broad&utm_content=Generic_cemilanbayi&gclsrc=aw.ds&gad_source=1&gad_campaignid=22626055845&gbraid=0AAAAACpIl78WO2cq7zN1iASJ4eALmb0Vq&gclid=CjwKCAjwt7XQBhBkEiwAtStpp4pAXj0TtFI43f80Sr_TCGh3B1A5IwjPECbrz181-Vle6q9yAUpLRRoCge4QAvD_BwE"
+    },
+    {
+      "id": 4,
+      "image": "https://www.generasimaju.co.id/articles/article/image-thumb__608091__webp/mpasi-pertama-buah-atau-bubur-sgm_1.webp",
+      "tag": "MPASI",
+      "title": "Panduan MPASI Pertama untuk Ibu Baru",
+      "excerpt": "Panduan MPASI Pertama untuk Ibu Baru",
+      "readTime": "4 menit baca",
+      "url": "https://www.generasimaju.co.id/artikel/4-6-bulan/nutrisi/mpasi-pertama-buah-atau-bubur"
+    },
+    {
+      "id": 5,
+      "image": "https://cdn.hellosehat.com/wp-content/uploads/2019/05/gizi-balita.jpg?w=1400&q=100",
+      "tag": "NUTRISI",
+      "title": "Panduan Memenuhi Kebutuhan Gizi Bayi (Usia 0-12 Bulan)",
+      "excerpt": "Pemberian nutrisi di awal masa kehidupan penting bagi pertumbuhan si Kecil. Bagaimana aturan memenuhi kebutuhan gizi bayi setiap harinya?",
+      "readTime": "6 menit baca",
+      "url": "https://hellosehat.com/parenting/bayi/gizi-bayi/kebutuhan-gizi-bayi/"
+    },
+    {
+      "id": 6,
+      "image": "https://images.unsplash.com/photo-1624727828489-a1e03b79bba8?w=400&q=80",
+      "tag": "NUTRISI",
+      "title": "Panduan Memenuhi Kebutuhan Gizi Bayi (Usia 0-12 Bulan)",
+      "excerpt": "Pemberian nutrisi di awal masa kehidupan penting bagi pertumbuhan si Kecil. Bagaimana aturan memenuhi kebutuhan gizi bayi setiap harinya?",
+      "readTime": "6 menit baca",
+      "url": "https://hellosehat.com/parenting/bayi/gizi-bayi/kebutuhan-gizi-bayi/"
+    }
+  ]
+}
