@@ -1,8 +1,8 @@
-const { PrismaClient } = require('@prisma/client');
-const { PrismaPg } = require('@prisma/adapter-pg');
-const { Pool } = require('pg');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { getAgeInMonths } = require('../utils/growth.helper');
+const { PrismaClient } = require("@prisma/client");
+const { PrismaPg } = require("@prisma/adapter-pg");
+const { Pool } = require("pg");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { getAgeInMonths } = require("../utils/growth.helper");
 
 const connectionString = process.env.DATABASE_URL;
 const pool = new Pool({ connectionString });
@@ -13,8 +13,8 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Helper untuk memastikan tanggal selalu di format YYYY-MM-DD sesuai zona waktu WIB
 const getWIBDateString = (dateObj) => {
-  return new Intl.DateTimeFormat('en-CA', { 
-    timeZone: 'Asia/Jakarta' 
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
   }).format(dateObj); // Output pasti: "YYYY-MM-DD"
 };
 
@@ -24,15 +24,16 @@ const getDailyInsight = async (req, res) => {
 
     const child = await prisma.child.findUnique({
       where: { id: childId },
-      include: { growth_logs: { orderBy: { record_date: 'desc' }, take: 1 } }
+      include: { growth_logs: { orderBy: { record_date: "desc" }, take: 1 } },
     });
 
-    if (!child) return res.status(404).json({ message: "Data anak tidak ditemukan." });
+    if (!child)
+      return res.status(404).json({ message: "Data anak tidak ditemukan." });
 
     // Format tanggal hari ini 100% akurat di WIB
-    const todayString = getWIBDateString(new Date()); 
-    const lastInsightString = child.last_insight_date 
-      ? getWIBDateString(new Date(child.last_insight_date)) 
+    const todayString = getWIBDateString(new Date());
+    const lastInsightString = child.last_insight_date
+      ? getWIBDateString(new Date(child.last_insight_date))
       : null;
 
     // LOGIKA CACHING: Gemini hanya terpanggil jika ini adalah hari baru di Indonesia
@@ -44,8 +45,18 @@ const getDailyInsight = async (req, res) => {
     const ageMonths = getAgeInMonths(child.dob);
     const statusGizi = latestLog ? latestLog.global_status : "Normal";
 
-    const prompt = `Bertindaklah sebagai ahli gizi anak yang empatik. Berikan 1 tips nutrisi, kesehatan, atau MPASI praktis (maksimal 2 kalimat pendek) untuk anak usia ${ageMonths} bulan dengan status gizi ${statusGizi}. 
-    Berikan tips yang spesifik, aplikatif, dan tidak menggurui. Awali langsung ke inti tipsnya tanpa kata sapaan pembuka.`;
+    const budgetLimit = child.optimal_budget_cache
+      ? parseFloat(child.optimal_budget_cache)
+      : 0;
+
+    const prompt = `
+      Bertindaklah sebagai Ahli Gizi Anak yang sangat empatik.
+      Data Anak: Nama ${child.name}, Usia ${ageMonths} bulan, Status Gizi: ${statusGizi}.
+      Saran Anggaran Bulanan: Rp ${Math.round(budgetLimit).toLocaleString("id-ID")}.
+
+      Tugas: Buat tepat 1 kalimat tips gizi harian yang relevan dengan kondisi anak dan usia MPASI-nya.
+      Gunakan bahasa Indonesia yang santai dan hangat (sapaan Bunda/Ayah). Jangan gunakan emoji, simbol bintang (*), tanda pagar (#), atau format markdown apapun. Maksimal 2 kalimat.
+    `;
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const result = await model.generateContent(prompt);
@@ -56,12 +67,11 @@ const getDailyInsight = async (req, res) => {
       where: { id: childId },
       data: {
         daily_insight_text: newInsight,
-        last_insight_date: new Date() // Simpan timestamp saat ini
-      }
+        last_insight_date: new Date(), // Simpan timestamp saat ini
+      },
     });
 
     res.status(200).json({ insight: newInsight });
-
   } catch (error) {
     console.error("Error generating daily insight:", error);
     res.status(500).json({ message: "Gagal memproses tips harian." });

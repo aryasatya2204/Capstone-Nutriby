@@ -1,15 +1,6 @@
-import { useState } from "react";
 import NavbarDashboard from "../components/NavbarDashboard";
 import FooterDashboard from "../components/FooterDashboard";
-
 import articlesData from "../data/articles.json";
-
-const LOCAL_IMAGES = {};
-
-// Helper: resolve gambar — kalau ada di LOCAL_IMAGES pakai itu, kalau tidak pakai URL langsung
-function resolveImage(imageValue) {
-  return LOCAL_IMAGES[imageValue] || imageValue;
-}
 
 function ArticleCard({ article }) {
   return (
@@ -22,7 +13,7 @@ function ArticleCard({ article }) {
       {/* Gambar — rasio 4:3 */}
       <div className="w-full aspect-[4/3] overflow-hidden">
         <img
-          src={resolveImage(article.image)}
+          src={article.image}
           alt={article.title}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
@@ -58,35 +49,18 @@ function ArticleCard({ article }) {
   );
 }
 
-// ============================================================
-// HALAMAN UTAMA
-// ============================================================
 export default function Information() {
   const { featuredArticle, dailyQuote, latestArticles } = articlesData;
-  const [searchQuery, setSearchQuery] = useState("");
-  const filteredArticles = latestArticles.filter(
-    (a) =>
-      a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.excerpt?.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F3EFEA] font-['Lato']">
       <NavbarDashboard />
 
       <main className="flex-grow w-full max-w-2xl mx-auto px-4 py-6">
-        {/* ── SEARCH BAR ── */}
-        <input
-          type="text"
-          placeholder="Cari artikel..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full mb-6 rounded-xl border border-gray-300 p-3 outline-none focus:border-[#8B1E1E]"
-        />
         {/* ── JUDUL SECTION ── */}
         <div className="mb-5 text-center">
           <h1 className="text-[38px] font-extrabold text-[#8B1E1E] uppercase tracking-wide">
-            What News?
+            Baca Yuk!
           </h1>
           <p className="text-[13px] text-gray-500 mt-1">
             Temukan panduan nutrisi terbaik untuk tumbuh kembang si kecil
@@ -103,7 +77,7 @@ export default function Information() {
             className="flex gap-3 bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition flex-1 min-w-0"
           >
             <img
-              src={resolveImage(featuredArticle.image)}
+              src={featuredArticle.image}
               alt={featuredArticle.title}
               className="w-[90px] h-[90px] rounded-xl object-cover flex-shrink-0"
             />
@@ -149,9 +123,8 @@ export default function Information() {
             Artikel Terbaru
           </h2>
 
-          {/* Grid 2 kolom — otomatis bertambah baris kalau artikel di JSON ditambah */}
           <div className="grid grid-cols-2 gap-4">
-            {filteredArticles.map((article) => (
+            {latestArticles.map((article) => (
               <ArticleCard key={article.id} article={article} />
             ))}
           </div>

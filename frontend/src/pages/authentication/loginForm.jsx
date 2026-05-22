@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/authContext";
 import { GoogleLogin } from "@react-oauth/google";
+import verified from "../../assets/verified.png";
 
 function LoginForm({ onClose, onShowRegister, onShowAuth }) {
   const navigate = useNavigate();
@@ -9,15 +10,36 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [emailError, setEmailError] = useState(""); // validasi email inline
+
+  const isGmail = (email) => /^[^\s@]+@gmail\.com$/.test(email);
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm({ ...form, [name]: value });
     setError("");
+
+    // Validasi email real-time: hanya tampil kalau user sudah ngetik @
+    if (name === "email") {
+      if (value.includes("@") && !isGmail(value)) {
+        setEmailError("Email harus menggunakan @gmail.com");
+      } else {
+        setEmailError("");
+      }
+    }
   };
+
+  // Tombol Masuk hanya aktif jika email valid gmail
+  const isFormValid = isGmail(form.email) && form.password.length > 0;
 
   const handleManualLogin = async () => {
     if (!form.email || !form.password) {
       setError("Email dan Password wajib diisi!");
+      return;
+    }
+    if (!isGmail(form.email)) {
+      setEmailError("Email harus menggunakan @gmail.com");
       return;
     }
 
@@ -31,14 +53,15 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
       const data = await res.json();
 
       if (res.ok) {
-        // === PERBAIKAN: SIMPAN TOKEN & DATA USER KE LOCALSTORAGE ===
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
+        login(data.user);
 
-        login(data.user); // Update state context global
-
-        onClose();
-        navigate("/dashboard");
+        setShowSuccess(true);
+        setTimeout(() => {
+          onClose();
+          navigate("/dashboard");
+        }, 2000);
       } else {
         setError(
           data.message || "Gagal login, periksa kembali email/password Anda.",
@@ -60,14 +83,15 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
       });
       const data = await res.json();
       if (res.ok) {
-        // === PERBAIKAN: SIMPAN TOKEN & DATA USER KE LOCALSTORAGE ===
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
+        login(data.user);
 
-        login(data.user); // Update state context global
-
-        onClose();
-        navigate("/dashboard");
+        setShowSuccess(true);
+        setTimeout(() => {
+          onClose();
+          navigate("/dashboard");
+        }, 2000);
       } else {
         setError(data.message || "Login Google gagal.");
       }
@@ -76,6 +100,27 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
     }
   };
 
+  // ── POPUP SUKSES ──
+  if (showSuccess) {
+    return (
+      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="flex flex-col items-center justify-center rounded-3xl bg-white px-12 py-16 text-center shadow-2xl">
+          <img
+            src={verified}
+            alt="Verified"
+            className="mb-4 h-24 w-24 object-contain drop-shadow-md"
+          />
+          <h2 className="text-3xl font-bold text-[#8B2020]">Login Berhasil!</h2>
+          <p className="mt-2 text-lg font-medium text-[#8B2020]">
+            Selamat datang di NutriBy.
+          </p>
+          <p className="mt-1 text-sm text-gray-400">Mengalihkan ke dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── FORM LOGIN ──
   return (
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
@@ -97,7 +142,8 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
         )}
 
         <div className="space-y-6">
-          <div className="relative flex flex-col">
+          {/* EMAIL */}
+          <div className="flex flex-col">
             <label className="text-sm font-medium mb-1 uppercase opacity-90">
               Email
             </label>
@@ -106,10 +152,20 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
               name="email"
               value={form.email}
               onChange={handleChange}
-              className="w-full bg-transparent border-b-2 border-white/50 py-2 outline-none focus:border-white transition-colors"
+              placeholder="contoh@gmail.com"
+              className={`w-full bg-transparent border-b-2 py-2 outline-none transition-colors placeholder:opacity-40
+                ${emailError ? "border-red-300" : "border-white/50 focus:border-white"}`}
             />
+            {/* Pesan validasi email muncul real-time */}
+            {emailError && (
+              <p className="mt-1.5 flex items-center gap-1 text-[12px] text-red-300">
+                <span>⚠</span> {emailError}
+              </p>
+            )}
           </div>
-          <div className="relative flex flex-col">
+
+          {/* PASSWORD */}
+          <div className="flex flex-col">
             <label className="text-sm font-medium mb-1 uppercase opacity-90">
               Password
             </label>
@@ -123,10 +179,16 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
           </div>
         </div>
 
+        {/* Tombol disabled kalau email bukan gmail atau password kosong */}
         <button
           onClick={handleManualLogin}
-          disabled={isLoading}
-          className="mt-10 w-full rounded-full bg-white py-3.5 text-[18px] font-bold text-[#8B2020] hover:bg-gray-100 transition-colors disabled:opacity-70"
+          disabled={isLoading || !isFormValid}
+          title={!isFormValid ? "Lengkapi email @gmail.com dan password terlebih dahulu" : ""}
+          className={`mt-10 w-full rounded-full py-3.5 text-[18px] font-bold transition-all
+            ${isFormValid && !isLoading
+              ? "bg-white text-[#8B2020] hover:bg-gray-100 cursor-pointer"
+              : "bg-white/40 text-white/60 cursor-not-allowed"
+            }`}
         >
           {isLoading ? "Memproses..." : "Masuk"}
         </button>
@@ -142,7 +204,7 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
           <GoogleLogin
             onSuccess={handleGoogleSuccess}
             onError={() => setError("Google Login Failed")}
-            theme="filled_blue"  
+            theme="outline"
             size="large"
             width="100%"
             text="continue_with"

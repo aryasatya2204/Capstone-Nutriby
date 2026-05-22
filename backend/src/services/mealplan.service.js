@@ -70,9 +70,19 @@ const executeMealPlanAI = async (childId, isUpdate = false) => {
     const penghematan = budgetLimit - actualTotalCost;
 
     // 4. HIT GEMINI
-    let promptStatus = isUpdate 
-      ? `Data Pertumbuhan/Anggaran Terbaru Anak: Nama ${child.name}, Status Gizi: ${latestLog.global_status}. Saran Anggaran: Rp ${budgetLimit}. AI merancang 90 porsi senilai Rp ${actualTotalCost} (Lebih hemat Rp ${penghematan}). Berikan evaluasi singkat dan semangat atas perubahan data anak ini.`
-      : `Bertindaklah sebagai Ahli Gizi Anak. Nama ${child.name}, Status Gizi: ${latestLog.global_status}. Anggaran: Rp ${budgetLimit}. AI merancang rekomendasi 90 porsi senilai Rp ${actualTotalCost} (Lebih hemat Rp ${penghematan}). Berikan edukasi dan semangat.`;
+    let promptStatus = isUpdate
+      ? `Bertindaklah sebagai Ahli Gizi Anak yang empatik. Data terbaru anak: Nama ${child.name}, Status Gizi: ${latestLog.global_status}. Saran Anggaran Bulanan: Rp ${Math.round(budgetLimit).toLocaleString("id-ID")}. AI merancang 90 porsi senilai Rp ${Math.round(actualTotalCost).toLocaleString("id-ID")} (hemat Rp ${Math.round(penghematan).toLocaleString("id-ID")}).
+
+Tugas: Buat tepat 2 paragraf singkat.
+Paragraf 1: Berikan evaluasi positif atas perubahan data terbaru anak dengan bahasa menenangkan.
+Paragraf 2: Berikan semangat terkait penghematan budget dan pujian kecil kepada orang tua.
+Gunakan bahasa Indonesia yang santai, profesional, dan hangat (sapaan Bunda/Ayah). Jangan gunakan emoji, simbol bintang (*), tanda pagar (#), atau format markdown apapun. Maksimal 4 kalimat per paragraf.`
+      : `Bertindaklah sebagai Ahli Gizi Anak yang empatik. Data anak: Nama ${child.name}, Status Gizi: ${latestLog.global_status}. Saran Anggaran Bulanan: Rp ${Math.round(budgetLimit).toLocaleString("id-ID")}. AI merancang 90 porsi senilai Rp ${Math.round(actualTotalCost).toLocaleString("id-ID")} (hemat Rp ${Math.round(penghematan).toLocaleString("id-ID")}).
+
+Tugas: Buat tepat 2 paragraf singkat.
+Paragraf 1: Berikan edukasi gizi ringan tentang kondisi anak saat ini dengan bahasa yang menenangkan (tidak menghakimi).
+Paragraf 2: Berikan semangat terkait penghematan budget dan pujian kecil kepada orang tua.
+Gunakan bahasa Indonesia yang santai, profesional, dan hangat (sapaan Bunda/Ayah). Jangan gunakan emoji, simbol bintang (*), tanda pagar (#), atau format markdown apapun. Maksimal 4 kalimat per paragraf.`;
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const geminiResult = await model.generateContent(promptStatus);

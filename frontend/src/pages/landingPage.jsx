@@ -17,6 +17,7 @@ import step1Img from "../assets/landingPage/step1Img.jpeg";
 import step2Img from "../assets/landingPage/step2Img.jpeg";
 import step3Img from "../assets/landingPage/step3Img.jpeg";
 import step4Img from "../assets/landingPage/step4Img.jpeg";
+import fotoKeluarga from "../assets/landingPage/fotoKeluarga.png";
 
 const tantanganData = [
   {
@@ -65,17 +66,35 @@ const fiturData = [
 
 function LandingPage() {
   const [modal, setModal] = useState(null);
-  const location = useLocation(); // <--- PERBAIKAN: Menangkap trigger dari ProtectedRoute
+  const location = useLocation();
   const [guardError, setGuardError] = useState("");
 
-  // === PERBAIKAN: Efek penangkap tolakan dari Dashboard ===
   useEffect(() => {
+    // Handler scroll dari Navbar (dipanggil dari halaman lain)
+    if (location.state?.scrollTo) {
+      const id = location.state.scrollTo;
+      setTimeout(() => {
+        const element = document.getElementById(id);
+        if (element) {
+          const headerOffset = 80;
+          const offsetPosition =
+            element.getBoundingClientRect().top + window.scrollY - headerOffset;
+          window.scrollTo({ top: offsetPosition, behavior: "smooth" });
+        }
+      }, 100);
+    }
+
+    // Handler tolakan dari ProtectedRoute/Dashboard
     if (location.state?.fromGuard) {
       setTimeout(() => {
         setGuardError(location.state.message);
-        setModal("childReg"); // Buka paksa modal anak
+        setModal("childReg");
       }, 0);
-      window.history.replaceState({}, document.title); // Bersihkan URL agar tidak looping
+    }
+
+    // Bersihkan state URL agar tidak looping
+    if (location.state?.scrollTo || location.state?.fromGuard) {
+      window.history.replaceState({}, document.title);
     }
   }, [location]);
 
@@ -147,7 +166,10 @@ function LandingPage() {
       </section>
 
       {/* ── CARA KERJA (STEPS) SECTION ── */}
-      <section className="mx-auto mt-10 max-w-5xl px-4 md:mt-12 md:px-6">
+      <section
+        id="cara-kerja"
+        className="mx-auto mt-10 max-w-5xl px-4 md:mt-12 md:px-6"
+      >
         <h2 className="mb-1 text-center text-[18px] font-bold text-[#8B1E1E] md:text-[22px]">
           Temani Tumbuh Kembang Anak Anda, Dimulai dari Sini
         </h2>
@@ -174,7 +196,10 @@ function LandingPage() {
       </section>
 
       {/* ── FITUR SECTION ── */}
-      <section className="mx-auto mt-16 max-w-[700px] px-4 md:mt-20 md:px-6">
+      <section
+        id="fitur"
+        className="mx-auto mt-16 max-w-[700px] px-4 md:mt-20 md:px-6"
+      >
         <h2 className="mb-6 text-center text-[16px] font-bold text-[#8B1E1E] md:mb-8 md:text-[18px]">
           Nutriby hadir untuk membantu Anda
         </h2>
@@ -201,7 +226,10 @@ function LandingPage() {
       </section>
 
       {/* ── ABOUT SECTION ── */}
-      <section className="mx-auto mt-16 max-w-4xl px-4 md:mt-24 md:px-6">
+      <section
+        id="tentang"
+        className="mx-auto mt-16 max-w-4xl px-4 md:mt-24 md:px-6"
+      >
         <h2 className="mb-8 text-center text-[16px] font-bold text-[#8B1E1E] md:mb-10 md:text-[18px]">
           Solusi Cerdas untuk Nutrisi dan Tumbuh Kembang Anak
         </h2>
@@ -213,8 +241,12 @@ function LandingPage() {
               serta memantau tumbuh kembangnya secara optimal.
             </p>
           </div>
-          <div className="flex h-[160px] w-[160px] items-center justify-center rounded-xl bg-gray-200/50 md:h-[200px] md:w-[200px]">
-            <span className="text-sm text-gray-400">Gambar Keluarga</span>
+          <div className="flex h-[220px] w-[220px] items-center justify-center rounded-xl bg-gray-200/50 md:h-[280px] md:w-[280px]">
+            <img
+              src={fotoKeluarga}
+              alt="gambar keluarga"
+              className="h-[180px] w-auto object-contain md:h-[240px]"
+            />
           </div>
         </div>
       </section>

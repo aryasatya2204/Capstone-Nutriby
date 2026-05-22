@@ -23,6 +23,32 @@ export default function Dashboard() {
   const [dailyInsight, setDailyInsight] = useState("");
   const [isInsightLoading, setIsInsightLoading] = useState(false);
 
+  // Baca menu hari ini dari localStorage weekly plan (disimpan oleh WeeklyPlan.jsx)
+  const [todayMenu, setTodayMenu] = useState(null);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("mpasi_weekly_plan");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.weeklyMenu && parsed.weeklyMenu.length > 0 && parsed.generatedAt) {
+          // Hitung index hari berdasarkan selisih hari sejak plan dibuat
+          const startDate = new Date(parsed.generatedAt);
+          startDate.setHours(0, 0, 0, 0);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const diffDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+          // Hanya tampil jika plan masih dalam 7 hari
+          if (diffDays >= 0 && diffDays < 7) {
+            setTodayMenu(parsed.weeklyMenu[diffDays] || null);
+          }
+        }
+      }
+    } catch (e) {
+      // ignore corrupt storage
+    }
+  }, []);
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -265,13 +291,14 @@ export default function Dashboard() {
 
       <main className="mx-auto w-full max-w-7xl flex-grow p-4 py-8 md:p-8">
         {/* BANNER WELCOME */}
-        <div className="mb-8 overflow-hidden rounded-3xl bg-white p-6 shadow-sm md:p-10 relative">
-          <div className="relative z-10 w-full md:w-2/3">
+        <div className="mb-8 overflow-hidden rounded-3xl bg-white p-6 shadow-sm md:p-10 relative flex items-center justify-between">
+          <div className="relative z-10 max-w-2xl">
             <h1 className="text-3xl font-extrabold text-[#8B2020] md:text-5xl uppercase leading-tight">
               Welcome Back,
               <br />
               Mommy!
             </h1>
+
             <p className="mt-4 text-base text-gray-600 md:text-lg">
               Saat ini sang buah hati,{" "}
               <span className="font-bold text-[#8B2020]">{childData.name}</span>{" "}
@@ -286,11 +313,12 @@ export default function Dashboard() {
               .
             </p>
           </div>
+
           <img
-        src={gambarDashboard}
-  alt="dashboard illustration"
-  className="absolute right-0 bottom-0 h-full max-h-[180px] object-contain opacity-90 hidden md:block"
-/>
+            src={gambarDashboard}
+            alt="dashboard illustration"
+            className="hidden md:block w-48 object-contain opacity-90"
+          />
         </div>
 
         {/* GRID UTAMA DASHBOARD */}
@@ -410,11 +438,28 @@ export default function Dashboard() {
 
             <div className="rounded-3xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col items-center">
               <h2 className="mb-4 text-lg font-bold text-[#8B2020] uppercase">
-                Allergy Alert
+                Ringkasan Data
               </h2>
-              <div className="w-full rounded-2xl border-2 border-red-200 bg-white p-4 shadow-inner mb-4">
+
+              {/* Pendapatan Orang Tua */}
+              <div className="w-full rounded-2xl bg-[#FFF8F0] border border-orange-100 p-4 mb-3">
+                <p className="text-xs font-bold text-gray-500 uppercase mb-2">
+                  💰 Pendapatan Orang Tua
+                </p>
+                <p className="text-base font-extrabold text-[#8B2020]">
+                  {childData.parent_salary
+                    ? `Rp ${Number(childData.parent_salary).toLocaleString("id-ID")}`
+                    : <span className="text-gray-400 font-normal text-sm">Belum diisi</span>}
+                </p>
+              </div>
+
+              {/* Alergi */}
+              <div className="w-full rounded-2xl border-2 border-red-200 bg-white p-4 shadow-inner mb-3">
+                <p className="text-xs font-bold text-gray-500 uppercase mb-2">
+                  ⚠️ Alergi / Pantangan
+                </p>
                 {childData.allergies?.length > 0 ? (
-                  <div className="flex flex-wrap gap-2 justify-center">
+                  <div className="flex flex-wrap gap-2">
                     {childData.allergies.map((a) => (
                       <span
                         key={a.allergy_category.id}
@@ -425,17 +470,18 @@ export default function Dashboard() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-center text-sm text-gray-400">
+                  <p className="text-sm text-gray-400">
                     Tidak ada alergi terdaftar
                   </p>
                 )}
               </div>
 
-              <div className="w-full mt-2 mb-6 text-center">
+              {/* Makanan Favorit */}
+              <div className="w-full mb-5">
                 <p className="text-xs font-bold text-gray-500 mb-2 uppercase">
-                  Makanan Favorit:
+                  🥦 Makanan Favorit
                 </p>
-                <div className="flex flex-wrap gap-2 justify-center">
+                <div className="flex flex-wrap gap-2">
                   {childData.preferences?.length > 0 ? (
                     childData.preferences.map((p) => (
                       <span
@@ -457,21 +503,55 @@ export default function Dashboard() {
                 onClick={() => setShowEditModal(true)}
                 className="rounded-full bg-red-50 px-6 py-2.5 text-sm font-bold text-[#8B2020] transition-colors hover:bg-red-100"
               >
-                Kelola Alergi & Sensitivitas
+                Edit Data Anak
               </button>
             </div>
           </div>
 
           <div className="flex flex-col gap-6 lg:col-span-2">
-            <div className="rounded-3xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col items-center min-h-[350px]">
-              <h2 className="text-2xl font-bold text-[#8B2020] mb-6 mt-4">
+            <div className="rounded-3xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col min-h-[350px]">
+              <h2 className="text-2xl font-bold text-[#8B2020] mb-6 mt-4 text-center">
                 Rekomendasi Menu Hari ini
               </h2>
-              {activeMealPlan ? (
-                <div className="w-full text-center">
-                  <p className="text-gray-500">
-                    Perencanaan MPASI bulanan berhasil disinkronisasi.
-                  </p>
+              {todayMenu ? (
+                <div className="w-full space-y-3">
+                  {[
+                    { slot: "pagi", label: "Sarapan", time: "08:00", icon: "☀️", bg: "bg-amber-50", border: "border-amber-100", textColor: "text-amber-700" },
+                    { slot: "siang", label: "Makan Siang", time: "12:00", icon: "🌤️", bg: "bg-orange-50", border: "border-orange-100", textColor: "text-orange-700" },
+                    { slot: "malam", label: "Makan Malam", time: "19:00", icon: "🌙", bg: "bg-indigo-50", border: "border-indigo-100", textColor: "text-indigo-700" },
+                  ].map(({ slot, label, time, icon, bg, border, textColor }) => {
+                    const menu = todayMenu[slot];
+                    return (
+                      <div
+                        key={slot}
+                        className={`flex items-center gap-4 rounded-2xl border ${border} ${bg} p-4`}
+                      >
+                        <div className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-white shadow-sm overflow-hidden`}>
+                          {menu?.image_url
+                            ? <img src={menu.image_url} alt="" className="w-12 h-12 object-cover" />
+                            : icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-xs font-bold uppercase tracking-wider ${textColor}`}>
+                            {label} · {time}
+                          </p>
+                          <p className="text-sm font-bold text-gray-800 truncate mt-0.5">
+                            {menu?.name || "Menu tidak tersedia"}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {menu?.calories ? `${menu.calories} kkal` : "-"}
+                          </p>
+                        </div>
+                        <div className="flex-shrink-0 text-right">
+                          <p className="text-xs font-bold text-[#8B2020]">
+                            {menu?.est_price
+                              ? `Rp ${Number(menu.est_price).toLocaleString("id-ID")}`
+                              : "-"}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center flex-grow text-center opacity-60">
@@ -484,9 +564,14 @@ export default function Dashboard() {
                     Anda belum membuat perencanaan MPASI
                   </p>
                   <p className="text-sm text-gray-400 mt-2 max-w-sm">
-                    Daftar makanan harian akan otomatis tertata setelah Anda
-                    membuat perencanaan gizi.
+                    Buat plan mingguan terlebih dahulu agar menu hari ini tampil di sini.
                   </p>
+                  <a
+                    href="/features/weekly-plan"
+                    className="mt-4 rounded-full bg-[#8B2020] px-6 py-2.5 text-sm font-bold text-white hover:bg-[#6b1515] transition-colors"
+                  >
+                    Buat Plan Mingguan →
+                  </a>
                 </div>
               )}
             </div>
@@ -497,7 +582,15 @@ export default function Dashboard() {
                   Catatan dari NutriBot:
                 </h3>
                 <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-700 italic border border-gray-200 whitespace-pre-wrap leading-relaxed shadow-sm">
-                  "{activeMealPlan.ai_insight_text}"
+                  {/* BUG #4 FIX: null check sebelum .split() agar tidak crash */}
+                  {activeMealPlan.ai_insight_text
+                    ? activeMealPlan.ai_insight_text.split("\n\n").map((para, i) => (
+                        <p key={i} className="mb-2 last:mb-0">
+                          {para}
+                        </p>
+                      ))
+                    : <p className="text-gray-400 not-italic">Catatan belum tersedia.</p>
+                  }
                 </div>
               </div>
             )}

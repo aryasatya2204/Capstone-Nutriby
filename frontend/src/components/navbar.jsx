@@ -26,12 +26,16 @@ function Navbar({ onLoginClick }) {
         isScrolled ? "py-3 shadow-md" : "py-5 shadow-none"
       }`}
     >
-      {/* Logo → section1 */}
+      {/* Logo → scroll ke atas */}
       <div
         className="flex cursor-pointer items-center gap-2"
-        onClick={() => scrollTo("section1")}
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
       >
-        <img src={Logo} alt="Logo NutriBy" className="h-9 w-9 object-contain" />
+        <img
+          src={Logo}
+          alt="Logo NutriBy"
+          className="h-9 w-9 object-contain"
+        />
         <span className="font-['Lato'] text-[20px] font-bold text-[#801A1A]">
           NutriBy
         </span>
@@ -39,23 +43,20 @@ function Navbar({ onLoginClick }) {
 
       {/* Desktop menu */}
       <div className="hidden items-center gap-10 text-[15px] font-semibold text-gray-700 md:flex">
-        {/* Fitur → section4 */}
         <button
-          onClick={() => scrollTo("section4")}
+          onClick={() => scrollTo("fitur")}
           className="transition-colors hover:text-[#801A1A]"
         >
           Fitur
         </button>
-        {/* Cara Kerja → section3 */}
         <button
-          onClick={() => scrollTo("section3")}
+          onClick={() => scrollTo("cara-kerja")}
           className="transition-colors hover:text-[#801A1A]"
         >
           Cara Kerja
         </button>
-        {/* Tentang → section5 */}
         <button
-          onClick={() => scrollTo("section5")}
+          onClick={() => scrollTo("tentang")}
           className="transition-colors hover:text-[#801A1A]"
         >
           Tentang

@@ -1,34 +1,3 @@
-/**
- * ============================================================================
- * GrowthTracker.jsx — Smart Growth Tracker
- * ============================================================================
- * Halaman ini menampilkan fitur pemantauan pertumbuhan anak (berat & tinggi)
- * dibandingkan dengan standar WHO, lengkap dengan grafik dan status gizi.
- *
- * ALUR KERJA:
- * 1. Mount → GET /api/children  (ambil data anak + childId)
- * 2. Mount → GET /api/growth/:childId/chart  (ambil riwayat log pertumbuhan)
- * 3. User input berat & tinggi → POST /api/growth/:childId/log
- *    Backend akan hitung z-score, status gizi, lalu trigger AI meal plan update
- * 4. Setelah berhasil simpan, tombol masuk cooldown 7 hari (168 jam)
- *    Timestamp cooldown disimpan di localStorage dengan key "growth_cooldown_{childId}"
- *
- * CATATAN INTEGRASI BACKEND:
- * - GET  /api/growth/:childId/chart
- *   → Response: { data: { weight_chart: [...], height_chart: [...] } }
- *   → Setiap item: { log_id, date_label, value, zscore, status }
- * - POST /api/growth/:childId/log
- *   → Body: { weight: number, height: number }
- *   → Response: { message, data: { berat, tinggi, global_status, ... } }
- * - Auth: Bearer token dari localStorage
- *
- * ATURAN COOLDOWN:
- * - Setelah simpan berhasil, simpan timestamp ke localStorage
- * - Cek selisih waktu saat ini vs timestamp → jika < 7 hari, tombol disabled
- * - Key localStorage: "growth_cooldown_{childId}"
- * ============================================================================
- */
-
 import { useState, useEffect, useCallback } from "react";
 import NavbarDashboard from "../../components/NavbarDashboard";
 import FooterDashboard from "../../components/FooterDashboard";
@@ -59,7 +28,6 @@ const formatCountdown = (ms) => {
 };
 
 // ─── HELPER: WARNA STATUS GIZI ────────────────────────────────────────────────
-// Mengembalikan class Tailwind sesuai status dari backend
 const getStatusStyle = (status) => {
   const s = (status || "").toLowerCase();
   if (s.includes("baik") || s.includes("normal"))
@@ -75,17 +43,6 @@ const getStatusStyle = (status) => {
   return { bg: "bg-gray-100", text: "text-gray-600", dot: "bg-gray-400" };
 };
 
-// ─── KOMPONEN: GRAFIK CUSTOM SVG ──────────────────────────────────────────────
-/**
- * GrowthChart — Grafik garis pertumbuhan menggunakan SVG murni (tanpa library)
- * Menampilkan dua garis: data aktual anak vs target WHO
- *
- * Props:
- * - data: array { date_label, value }  — data dari backend
- * - whoTarget: angka target WHO rata-rata (opsional, untuk garis referensi)
- * - unit: string ("kg" atau "cm")
- * - color: hex warna garis aktual
- */
 function GrowthChart({ data, whoTarget, unit, color = "#8B2020" }) {
   // Guard: jika data kosong tampilkan placeholder
   if (!data || data.length === 0) {
@@ -317,58 +274,44 @@ function StatCard({ label, value, unit, delta, icon }) {
 // ─── KOMPONEN UTAMA: GrowthTracker ───────────────────────────────────────────
 export default function GrowthTracker() {
   // === STATE DATA ===
-  const [childData, setChildData] = useState(null); // Data anak dari /api/children
+  const [childData, setChildData] = useState(null);
   const [chartData, setChartData] = useState({
-    // Data grafik dari /api/growth/:id/chart
     weight_chart: [],
     height_chart: [],
   });
-  const [isLoadingData, setIsLoadingData] = useState(true); // Loading saat fetch awal
-  const [isSaving, setIsSaving] = useState(false); // Loading saat POST log baru
-  const [saveSuccess, setSaveSuccess] = useState(false); // Flag sukses simpan
-  const [errorMsg, setErrorMsg] = useState(""); // Pesan error
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  // === STATE FORM INPUT ===
-  const [beratInput, setBeratInput] = useState(""); // Input berat badan (kg)
-  const [tinggiInput, setTinggiInput] = useState(""); // Input tinggi badan (cm)
+  const [beratInput, setBeratInput] = useState("");
+  const [tinggiInput, setTinggiInput] = useState("");
   const [tanggalInput, setTanggalInput] = useState(
-    // Default: hari ini
     new Date().toISOString().split("T")[0],
   );
 
   // === STATE TAMPILAN ===
   const [activeChart, setActiveChart] = useState("berat"); // "berat" atau "tinggi"
-  const [cooldownRemaining, setCooldownRemaining] = useState(0); // Sisa cooldown dalam ms
+  const [cooldownRemaining, setCooldownRemaining] = useState(0); // Sisa cooldown dalam ms\
 
-  // ─── CEK COOLDOWN DARI LOCALSTORAGE ──────────────────────────────────────
-  /**
-   * Cooldown disimpan di localStorage dengan format:
-   * Key: "growth_cooldown_{childId}"
-   * Value: timestamp ISO saat terakhir submit berhasil
-   *
-   * Setiap 1 menit, state cooldownRemaining di-update agar countdown real-time
-   */
-  const checkCooldown = useCallback((childId) => {
-    if (!childId) return;
-    const stored = localStorage.getItem(`growth_cooldown_${childId}`);
-    if (!stored) {
-      setCooldownRemaining(0);
-      return;
-    }
-    const lastSubmit = new Date(stored).getTime();
-    const now = Date.now();
-    const elapsed = now - lastSubmit;
-    const remaining = COOLDOWN_MS - elapsed;
+  const checkCooldown = useCallback((child) => {
+    if (!child) return;
+    // Ambil tanggal log terakhir dari data backend (growth_logs)
+    const lastLog = child.growth_logs?.[0];
+    if (!lastLog?.record_date) { setCooldownRemaining(0); return; }
+
+    const lastTime = new Date(lastLog.record_date).getTime();
+    const remaining = COOLDOWN_MS - (Date.now() - lastTime);
     setCooldownRemaining(remaining > 0 ? remaining : 0);
   }, []);
 
-  // Update countdown setiap menit
+  // Update countdown setiap menit berdasarkan data backend
   useEffect(() => {
-    if (!childData?.id) return;
-    checkCooldown(childData.id);
-    const interval = setInterval(() => checkCooldown(childData.id), 60000);
+    if (!childData) return;
+    checkCooldown(childData);
+    const interval = setInterval(() => checkCooldown(childData), 60000);
     return () => clearInterval(interval);
-  }, [childData?.id, checkCooldown]);
+  }, [childData, checkCooldown]);
 
   // ─── FETCH DATA AWAL ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -378,14 +321,12 @@ export default function GrowthTracker() {
         const token = localStorage.getItem("token");
         const headers = { Authorization: `Bearer ${token}` };
 
-        // 1. Fetch data anak — sama seperti dashboard.jsx
         const childRes = await fetch(`${API_BASE}/children`, { headers });
         const childJson = await childRes.json();
         const child = childJson?.[0];
         if (!child) return;
         setChildData(child);
 
-        // 2. Fetch data chart pertumbuhan — GET /api/growth/:childId/chart
         const chartRes = await fetch(`${API_BASE}/growth/${child.id}/chart`, {
           headers,
         });
@@ -394,8 +335,8 @@ export default function GrowthTracker() {
           setChartData(chartJson.data);
         }
 
-        // 3. Cek cooldown setelah dapat childId
-        checkCooldown(child.id);
+        // Cek cooldown dari data backend (growth_logs dari /children)
+        checkCooldown(child);
       } catch (err) {
         console.error("Gagal fetch data growth tracker:", err);
         setErrorMsg("Gagal memuat data. Silakan refresh halaman.");
@@ -421,16 +362,6 @@ export default function GrowthTracker() {
     try {
       const token = localStorage.getItem("token");
 
-      /**
-       * POST /api/growth/:childId/log
-       * Body: { weight, height }
-       * Backend akan:
-       * 1. Hitung z-score WFA, HFA, WFH vs standar WHO
-       * 2. Tentukan status gizi global (global_status)
-       * 3. Hitung target kalori, protein, dll via Waterlow
-       * 4. Simpan ke growth_logs
-       * 5. Trigger ulang AI meal plan (executeMealPlanAI dengan isUpdate=true)
-       */
       const res = await fetch(`${API_BASE}/growth/${childData.id}/log`, {
         method: "POST",
         headers: {
@@ -440,7 +371,7 @@ export default function GrowthTracker() {
         body: JSON.stringify({
           weight: parseFloat(beratInput),
           height: parseFloat(tinggiInput),
-          // Tanggal input dikirim juga jika backend support (opsional)
+
           date: tanggalInput,
         }),
       });
@@ -448,13 +379,17 @@ export default function GrowthTracker() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Gagal menyimpan data.");
 
-      // ── Berhasil: simpan timestamp cooldown ──────────────────────────
-      // Key: "growth_cooldown_{childId}" → dipakai checkCooldown()
-      localStorage.setItem(
-        `growth_cooldown_${childData.id}`,
-        new Date().toISOString(),
-      );
-      setCooldownRemaining(COOLDOWN_MS);
+      // Refresh data anak dari backend agar cooldown dihitung dari server
+      const childRes = await fetch(`${API_BASE}/children`, { headers: { Authorization: `Bearer ${token}` } });
+      const childJson = await childRes.json();
+      const updatedChild = childJson?.[0];
+      if (updatedChild) {
+        setChildData(updatedChild);
+        checkCooldown(updatedChild); // cooldown dari backend, bukan localStorage
+      } else {
+        setCooldownRemaining(COOLDOWN_MS); // fallback jika re-fetch gagal
+      }
+
       setSaveSuccess(true);
 
       // Reset form input
@@ -480,12 +415,11 @@ export default function GrowthTracker() {
   };
 
   // ─── DATA TERAKHIR (untuk StatCard) ─────────────────────────────────────
-  const lastWeight = chartData.weight_chart.slice(-1)[0]; // Log berat terakhir
-  const prevWeight = chartData.weight_chart.slice(-2)[0]; // Log berat sebelumnya
-  const lastHeight = chartData.height_chart.slice(-1)[0]; // Log tinggi terakhir
-  const prevHeight = chartData.height_chart.slice(-2)[0]; // Log tinggi sebelumnya
+  const lastWeight = chartData.weight_chart.slice(-1)[0];
+  const prevWeight = chartData.weight_chart.slice(-2)[0];
+  const lastHeight = chartData.height_chart.slice(-1)[0];
+  const prevHeight = chartData.height_chart.slice(-2)[0];
 
-  // Hitung delta (selisih dengan pengukuran sebelumnya)
   const deltaWeight =
     lastWeight && prevWeight
       ? (parseFloat(lastWeight.value) - parseFloat(prevWeight.value)).toFixed(1)
@@ -683,7 +617,6 @@ export default function GrowthTracker() {
                 </div>
               )}
 
-              {/* Notifikasi Sukses */}
               {saveSuccess && (
                 <div
                   className="mt-3 bg-green-50 border border-green-100 rounded-xl p-3
@@ -771,14 +704,12 @@ export default function GrowthTracker() {
 
           {/* ═══ KOLOM KANAN: GRAFIK & STATISTIK ═══════════════════ */}
           <div className="lg:col-span-3 space-y-4">
-            {/* Card: Grafik Pertumbuhan */}
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-base font-black text-gray-800">
                   Grafik Pertumbuhan
                 </h2>
 
-                {/* Toggle Berat / Tinggi — sesuai desain referensi */}
                 <div className="flex rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
                   <button
                     onClick={() => setActiveChart("berat")}
@@ -819,19 +750,16 @@ export default function GrowthTracker() {
                   }
                   unit={activeChart === "berat" ? "kg" : "cm"}
                   color="#8B2020"
-                  // WHO target perkiraan sederhana (nilai median)
                   whoTarget={
                     activeChart === "berat"
                       ? chartData.weight_chart.length > 0
-                        ? // Ambil rata-rata nilai sebagai "target acuan" jika tidak ada data WHO di FE
-                          null
+                        ? null
                         : null
                       : null
                   }
                 />
               )}
 
-              {/* Legenda grafik */}
               <div className="flex items-center gap-4 mt-3 justify-end">
                 <div className="flex items-center gap-1.5">
                   <div className="w-3 h-3 rounded-full bg-[#8B2020]" />
@@ -844,7 +772,6 @@ export default function GrowthTracker() {
               </div>
             </div>
 
-            {/* Card: Statistik (4 stat card — 1 baris horizontal) */}
             <div className="grid grid-cols-4 gap-2">
               <StatCard
                 icon="⚖️"
@@ -887,13 +814,11 @@ export default function GrowthTracker() {
               />
             </div>
 
-            {/* Card: Motivasi Bunda (sesuai desain referensi) */}
             {!isLoadingData && chartData.weight_chart.length > 0 && (
               <div
                 className="bg-gradient-to-br from-[#8B2020] to-[#6b1020] rounded-3xl p-6 text-white
                 relative overflow-hidden"
               >
-                {/* Dekorasi lingkaran di background */}
                 <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/5" />
                 <div className="absolute -right-4 -bottom-4 w-20 h-20 rounded-full bg-white/5" />
 
@@ -907,7 +832,6 @@ export default function GrowthTracker() {
                       : "Data pertumbuhan pertama sudah tercatat! Pantau terus setiap 7 hari untuk melihat perkembangan si kecil."}
                   </p>
 
-                  {/* Tombol unduh laporan PDF — placeholder */}
                   <button
                     className="flex items-center gap-2 bg-white/15 hover:bg-white/25
                     text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all duration-200

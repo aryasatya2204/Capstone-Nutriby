@@ -3,14 +3,14 @@ const { PrismaPg } = require("@prisma/adapter-pg");
 const { Pool } = require("pg");
 
 // 1. Import SEMUA helper yang dibutuhkan dari file helper Anda
-const { 
-  getAgeInMonths, 
-  calculateLMS, 
-  getStatusWFA, 
-  getStatusHFA, 
-  getStatusWFH, 
-  getGlobalStatus, 
-  calculateWaterlowCalories 
+const {
+  getAgeInMonths,
+  calculateLMS,
+  getStatusWFA,
+  getStatusHFA,
+  getStatusWFH,
+  getGlobalStatus,
+  calculateWaterlowCalories,
 } = require("../utils/growth.helper");
 
 const connectionString = process.env.DATABASE_URL;
@@ -45,8 +45,8 @@ const getGrowthChartData = async (req, res) => {
         message: "Anak ini belum memiliki riwayat pertumbuhan.",
         data: {
           weight_chart: [],
-          height_chart: []
-        }
+          height_chart: [],
+        },
       });
     }
 
@@ -54,30 +54,31 @@ const getGrowthChartData = async (req, res) => {
     const weightChart = logs.map((log) => ({
       log_id: log.id,
       date_label: log.record_date.toISOString().split("T")[0],
-      value: log.berat ? parseFloat(log.berat) : null, 
-      zscore: log.zscore_wfa ? parseFloat(log.zscore_wfa) : null, 
-      status: log.global_status 
+      value: log.berat ? parseFloat(log.berat) : null,
+      zscore: log.zscore_wfa ? parseFloat(log.zscore_wfa) : null,
+      status: log.global_status,
     }));
 
     const heightChart = logs.map((log) => ({
       log_id: log.id,
       date_label: log.record_date.toISOString().split("T")[0],
-      value: log.tinggi ? parseFloat(log.tinggi) : null, 
-      zscore: log.zscore_hfa ? parseFloat(log.zscore_hfa) : null, 
-      status: log.global_status 
+      value: log.tinggi ? parseFloat(log.tinggi) : null,
+      zscore: log.zscore_hfa ? parseFloat(log.zscore_hfa) : null,
+      status: log.global_status,
     }));
 
     res.status(200).json({
       message: "Data grafik riwayat pertumbuhan berhasil ditarik!",
       data: {
         weight_chart: weightChart,
-        height_chart: heightChart
-      }
+        height_chart: heightChart,
+      },
     });
-
   } catch (error) {
     console.error("Error fetching chart data:", error.message);
-    res.status(500).json({ message: "Gagal mengambil data grafik", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Gagal mengambil data grafik", error: error.message });
   }
 };
 
@@ -89,10 +90,12 @@ const getGrowthChartData = async (req, res) => {
 const addWeeklyGrowthLog = async (req, res) => {
   try {
     const { childId } = req.params;
-    const { weight, height } = req.body; 
+    const { weight, height } = req.body;
 
     if (weight === undefined || height === undefined) {
-      return res.status(400).json({ message: "Berat badan (weight) dan Tinggi badan (height) wajib diisi." });
+      return res.status(400).json({
+        message: "Berat badan (weight) dan Tinggi badan (height) wajib diisi.",
+      });
     }
 
     const child = await prisma.child.findUnique({
@@ -109,38 +112,79 @@ const addWeeklyGrowthLog = async (req, res) => {
 
     // A. TARIK DATA STANDAR WHO DARI DATABASE
     const whoWFA = await prisma.whoStandard.findFirst({
-      where: { indicator: "WFA", gender: child.gender, month_or_length: ageInMonths }
+      where: {
+        indicator: "WFA",
+        gender: child.gender,
+        month_or_length: ageInMonths,
+      },
     });
 
     const whoHFA = await prisma.whoStandard.findFirst({
-      where: { indicator: "HFA", gender: child.gender, month_or_length: ageInMonths }
+      where: {
+        indicator: "HFA",
+        gender: child.gender,
+        month_or_length: ageInMonths,
+      },
     });
 
     const heightRounded = Math.round(currentHeight * 2) / 2;
     const whoWFH = await prisma.whoStandard.findFirst({
-      where: { indicator: "WFH", gender: child.gender, month_or_length: heightRounded }
+      where: {
+        indicator: "WFH",
+        gender: child.gender,
+        month_or_length: heightRounded,
+      },
     });
 
-    // B. KALKULASI Z-SCORE & STATUS GIZI
-    const zscore_wfa_calc = whoWFA ? calculateLMS(currentWeight, whoWFA.l, whoWFA.m, whoWFA.s) : null;
-    const zscore_hfa_calc = whoHFA ? calculateLMS(currentHeight, whoHFA.l, whoHFA.m, whoHFA.s) : null;
-    const zscore_wfh_calc = whoWFH ? calculateLMS(currentWeight, whoWFH.l, whoWFH.m, whoWFH.s) : null;
+    // Tambahkan di addWeeklyGrowthLog, sebelum kalkulasi z-score:
+    const lastLog = await prisma.growthLog.findFirst({
+      where: { child_id: childId },
+      orderBy: { record_date: "desc" },
+    });
 
-    const status_wfa = zscore_wfa_calc !== null ? getStatusWFA(zscore_wfa_calc) : null;
-    const status_hfa = zscore_hfa_calc !== null ? getStatusHFA(zscore_hfa_calc) : null;
-    const status_wfh = zscore_wfh_calc !== null ? getStatusWFH(zscore_wfh_calc) : null;
-    
-    const global_status_calc = (status_wfh && status_hfa) 
-      ? getGlobalStatus(status_wfh, status_hfa) 
-      : "Data Tidak Lengkap";
+    if (lastLog) {
+      const daysSinceLast =
+        (Date.now() - new Date(lastLog.record_date).getTime()) /
+        (1000 * 60 * 60 * 24);
+      if (daysSinceLast < 7) {
+        const sisaHari = Math.ceil(7 - daysSinceLast);
+        return res.status(429).json({
+          message: `Input terlalu cepat. Tunggu ${sisaHari} hari lagi.`,
+          cooldown_remaining_days: sisaHari,
+        });
+      }
+    }
+
+    // B. KALKULASI Z-SCORE & STATUS GIZI
+    const zscore_wfa_calc = whoWFA
+      ? calculateLMS(currentWeight, whoWFA.l, whoWFA.m, whoWFA.s)
+      : null;
+    const zscore_hfa_calc = whoHFA
+      ? calculateLMS(currentHeight, whoHFA.l, whoHFA.m, whoHFA.s)
+      : null;
+    const zscore_wfh_calc = whoWFH
+      ? calculateLMS(currentWeight, whoWFH.l, whoWFH.m, whoWFH.s)
+      : null;
+
+    const status_wfa =
+      zscore_wfa_calc !== null ? getStatusWFA(zscore_wfa_calc) : null;
+    const status_hfa =
+      zscore_hfa_calc !== null ? getStatusHFA(zscore_hfa_calc) : null;
+    const status_wfh =
+      zscore_wfh_calc !== null ? getStatusWFH(zscore_wfh_calc) : null;
+
+    const global_status_calc =
+      status_wfh && status_hfa
+        ? getGlobalStatus(status_wfh, status_hfa)
+        : "Data Tidak Lengkap";
 
     // C. TARIK DATA STANDAR AKG & KALKULASI WATERLOW
     const akg = await prisma.akgStandard.findFirst({
       where: {
         gender: child.gender,
         min_age_months: { lte: ageInMonths },
-        max_age_months: { gte: ageInMonths }
-      }
+        max_age_months: { gte: ageInMonths },
+      },
     });
 
     let target_kalori = null;
@@ -148,14 +192,20 @@ const addWeeklyGrowthLog = async (req, res) => {
     let target_lemak = null;
     let target_besi = null;
     let target_zinc = null;
-    
+
     const bbi_kg = whoWFA ? parseFloat(whoWFA.m) : currentWeight;
 
     if (akg) {
-      const kkalPerKg = parseFloat(akg.calories) / parseFloat(akg.base_weight_kg);
+      const kkalPerKg =
+        parseFloat(akg.calories) / parseFloat(akg.base_weight_kg);
       // Menggunakan fungsi Waterlow baru yang sudah bebas dari bug nilai defisit
-      target_kalori = calculateWaterlowCalories(zscore_wfh_calc || 0, currentWeight, bbi_kg, kkalPerKg);
-      
+      target_kalori = calculateWaterlowCalories(
+        zscore_wfh_calc || 0,
+        currentWeight,
+        bbi_kg,
+        kkalPerKg,
+      );
+
       target_protein = parseFloat(akg.protein);
       target_lemak = parseFloat(akg.fat);
       target_besi = parseFloat(akg.iron);
@@ -181,8 +231,8 @@ const addWeeklyGrowthLog = async (req, res) => {
         target_lemak: target_lemak,
         target_besi: target_besi,
         target_zinc: target_zinc,
-        record_date: new Date()
-      }
+        record_date: new Date(),
+      },
     });
 
     // === LOGIKA WAJIB HIT BARU: RE-GENERATE DI BACKGROUND SAAT ADA PERTUMBUHAN BARU ===
@@ -190,21 +240,27 @@ const addWeeklyGrowthLog = async (req, res) => {
       // Mengirim flag isUpdate = true agar prompt Gemini menyesuaikan evaluasi berkala
       await executeMealPlanAI(childId, true);
     } catch (aiError) {
-      console.error("⚠️ Gagal memperbarui AI Insight terintegrasi setelah log pertumbuhan:", aiError.message);
+      console.error(
+        "⚠️ Gagal memperbarui AI Insight terintegrasi setelah log pertumbuhan:",
+        aiError.message,
+      );
     }
 
     res.status(201).json({
-      message: "Data pertumbuhan mingguan berhasil dicatat beserta analisis gizinya!",
-      data: newLog
+      message:
+        "Data pertumbuhan mingguan berhasil dicatat beserta analisis gizinya!",
+      data: newLog,
     });
-
   } catch (error) {
     console.error("Error adding growth log:", error.message);
-    res.status(500).json({ message: "Gagal menyimpan log pertumbuhan", error: error.message });
+    res.status(500).json({
+      message: "Gagal menyimpan log pertumbuhan",
+      error: error.message,
+    });
   }
 };
 
-module.exports = { 
-  getGrowthChartData, 
-  addWeeklyGrowthLog 
+module.exports = {
+  getGrowthChartData,
+  addWeeklyGrowthLog,
 };

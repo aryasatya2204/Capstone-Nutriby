@@ -10,17 +10,15 @@ const prisma = new PrismaClient({ adapter });
 /**
  * Mengambil kandidat resep yang AMAN (Sesuai umur & Bebas Alergi)
  * lalu memformatnya agar sesuai dengan Pydantic Schema FastAPI.
+ * 
+ * PENTING: formattedCandidates menyertakan SEMUA field resep lengkap
+ * agar controller bisa langsung return ke frontend tanpa query ulang.
  */
 const getSafeCandidateRecipes = async (ageInMonths, allergyCategoryIds) => {
-  // Query Prisma: Filter Deterministic
   const recipes = await prisma.recipe.findMany({
     where: {
-      // 1. Filter Umur
       min_age_months: { lte: ageInMonths },
       max_age_months: { gte: ageInMonths },
-      
-      // 2. Filter Alergi (Hard Constraint)
-      // JANGAN ambil resep yang berelasi dengan kategori alergi anak
       ...(allergyCategoryIds.length > 0 && {
         NOT: {
           allergies: {
@@ -31,31 +29,37 @@ const getSafeCandidateRecipes = async (ageInMonths, allergyCategoryIds) => {
     },
     include: {
       ingredients: { include: { ingredient: true } },
-      allergies: { include: { allergy_category: true } }
+      allergies:   { include: { allergy_category: true } }
     }
   });
 
-  // Format menjadi JSON sesuai schema RecipeCandidate di Pydantic main.py
   const formattedCandidates = recipes.map(r => ({
-    id: r.id,
+    // ── Field untuk ML / FastAPI (wajib ada) ──────────────────────────────
+    id:             r.id,
     min_age_months: r.min_age_months,
     max_age_months: r.max_age_months,
-    est_price: parseFloat(r.est_price),
-    
-    // Nutrisi
-    calories: parseFloat(r.calories),
-    protein: parseFloat(r.protein),
-    fat: parseFloat(r.fat),
-    iron: parseFloat(r.iron),
-    zinc: parseFloat(r.zinc),
-    
-    // Relasi Array String (Dibutuhkan oleh MultiLabelBinarizer di FastAPI)
-    ingredients: r.ingredients.map(i => i.ingredient.name),
-    allergies: r.allergies.map(a => a.allergy_category.name)
+    est_price:      parseFloat(r.est_price),
+    calories:       parseFloat(r.calories),
+    protein:        parseFloat(r.protein),
+    fat:            parseFloat(r.fat),
+    iron:           parseFloat(r.iron),
+    zinc:           parseFloat(r.zinc),
+    // Array string untuk MultiLabelBinarizer di FastAPI
+    ingredients:    r.ingredients.map(i => i.ingredient.name),
+    allergies:      r.allergies.map(a => a.allergy_category.name),
+
+    // ── Field lengkap untuk ditampilkan ke Frontend ───────────────────────
+    name:           r.name,
+    description:    r.description,
+    bahan_masakan:  r.bahan_masakan,
+    instructions:   r.instructions,
+    texture:        r.texture,
+    tags:           r.tags    || null,
+    image_url:      r.image_url || null,
   }));
 
   return {
-    raw_count: recipes.length,
+    raw_count:  recipes.length,
     candidates: formattedCandidates
   };
 };
