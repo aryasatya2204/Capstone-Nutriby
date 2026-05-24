@@ -1,281 +1,157 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import NavbarDashboard from "../../components/NavbarDashboard";
 import FooterDashboard from "../../components/FooterDashboard";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import RecipeDetailPopup from "./RecipeDetailPopup";
+import PrintableWeeklyPlan from "./PrintableWeeklyPlan";
 
-// ─── KONSTANTA ────────────────────────────────────────────────────────────────
 const API_BASE = "http://localhost:3000/api";
-const HARI = ["Senin", "Selasa", "Rabu", "Kamis", "Jum'at", "Sabtu", "Minggu"];
-const STORAGE_KEY = "mpasi_weekly_plan";
+const BASE_HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jum'at", "Sabtu"];
 
-// ─── HELPER: FORMAT RUPIAH ────────────────────────────────────────────────────
 const formatRupiah = (angka) =>
-  new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    minimumFractionDigits: 0,
-  }).format(angka);
+  new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(angka);
 
-const formatLabel = (str) =>
-  str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : "";
+const formatLabel = (str) => {
+  if (!str) return "";
+  return str
+    .replace(/_/g, " ")
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+};
 
-// ─── HELPER: CEK APAKAH HARI SUDAH LEWAT ─────────────────────────────────────
-function isDayPast(dayIdx, generatedAt) {
-  if (!generatedAt) return false;
-  const startDate = new Date(generatedAt);
-  startDate.setHours(0, 0, 0, 0);
-  const targetDate = new Date(startDate);
-  targetDate.setDate(startDate.getDate() + dayIdx);
+const getAgeDetail = (dob) => {
+  if (!dob) return { months: 0, days: 0 };
+  const birthDate = new Date(dob);
+  const today = new Date();
+  let months = (today.getFullYear() - birthDate.getFullYear()) * 12;
+  months -= birthDate.getMonth();
+  months += today.getMonth();
+  let days = today.getDate() - birthDate.getDate();
+  if (days < 0) {
+    months--;
+    const prevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+    days += prevMonth.getDate();
+  }
+  return { months: months < 0 ? 0 : months, days };
+};
+
+const calculateDayOffset = (createdAt) => {
+  if (!createdAt) return 0;
+  const start = new Date(createdAt);
+  start.setHours(0, 0, 0, 0);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  return targetDate < today;
+  return Math.floor((today - start) / (1000 * 60 * 60 * 24));
+};
+
+function ErrorModal({ message, onClose }) {
+  if (!message) return null;
+  return (
+    <div className="fixed inset-0 z-[700] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl text-center">
+        <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center text-2xl mx-auto mb-4 border border-red-100">
+          ⚠️
+        </div>
+        <h3 className="text-lg font-black text-gray-800 mb-2">Pemberitahuan</h3>
+        <p className="text-sm text-gray-500 mb-6 leading-relaxed">{message}</p>
+        <button onClick={onClose} className="w-full py-3 rounded-xl bg-[#8B2020] text-white text-sm font-black hover:bg-red-800 shadow-md">
+          Mengerti
+        </button>
+      </div>
+    </div>
+  );
 }
 
-// ─── KOMPONEN: POPUP DETAIL MENU ──────────────────────────────────────────────
-function MenuDetailPopup({ menu, label, icon, onClose }) {
-  if (!menu) return null;
+function DeleteConfirmationModal({ isOpen, onClose, onConfirm }) {
+  if (!isOpen) return null;
   return (
-    <div
-      className="fixed inset-0 z-[500] flex items-end sm:items-center justify-center p-0 sm:p-4"
-      style={{ backdropFilter: "blur(8px)", background: "rgba(0,0,0,0.45)" }}
-      onClick={onClose}
-    >
-      <div
-        className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden"
-        style={{ maxHeight: "90vh" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header popup */}
-        <div className="relative bg-gradient-to-br from-[#8B2020] to-[#c0392b] px-5 pt-5 pb-6">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-colors"
-          >
-            ✕
-          </button>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-white/70 text-xs font-bold uppercase tracking-wider">{label}</span>
-          </div>
-          {menu?.image_url ? (
-            <img
-              src={menu.image_url}
-              alt={menu.name}
-              className="w-16 h-16 rounded-2xl object-cover mb-3 shadow-lg border-2 border-white/30"
-            />
-          ) : (
-            <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center text-3xl mb-3">
-              {icon}
-            </div>
-          )}
-          <h3 className="text-xl font-black text-white leading-tight">
-            {menu?.name || menu?.nama || "Menu"}
-          </h3>
-          <p className="text-white/70 text-sm mt-1">
-            {menu?.texture || menu?.tekstur || ""}
-            {(menu?.texture || menu?.tekstur) && (menu?.min_age_months || menu?.usia_min) ? " · " : ""}
-            {menu?.min_age_months || menu?.usia_min
-              ? `${menu?.min_age_months || menu?.usia_min}–${menu?.max_age_months || menu?.usia_max} bulan`
-              : ""}
-          </p>
+    <div className="fixed inset-0 z-[650] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl text-center">
+        <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center text-2xl mx-auto mb-4 border border-red-100">
+          🗑️
         </div>
-
-        {/* Body popup scrollable */}
-        <div className="overflow-y-auto" style={{ maxHeight: "60vh" }}>
-          <div className="p-5 space-y-4">
-            {/* Harga, Kalori, Protein */}
-            <div className="grid grid-cols-3 gap-2">
-              <div className="bg-[#FFF8F0] rounded-2xl p-3 text-center">
-                <p className="text-xs text-gray-400 mb-0.5">Harga Est.</p>
-                <p className="text-sm font-black text-[#8B2020]">
-                  {formatRupiah(menu?.est_price || menu?.harga || 0)}
-                </p>
-              </div>
-              <div className="bg-orange-50 rounded-2xl p-3 text-center">
-                <p className="text-xs text-gray-400 mb-0.5">Kalori</p>
-                <p className="text-sm font-black text-orange-600">
-                  {menu?.calories || menu?.kalori || "-"}{" "}
-                  <span className="text-xs font-normal">kkal</span>
-                </p>
-              </div>
-              <div className="bg-blue-50 rounded-2xl p-3 text-center">
-                <p className="text-xs text-gray-400 mb-0.5">Protein</p>
-                <p className="text-sm font-black text-blue-600">
-                  {menu?.protein || "-"} <span className="text-xs font-normal">g</span>
-                </p>
-              </div>
-            </div>
-
-            {/* Nutrisi lanjutan */}
-            {(menu?.fat || menu?.iron || menu?.zinc) && (
-              <div className="grid grid-cols-3 gap-2">
-                <div className="bg-yellow-50 rounded-2xl p-3 text-center">
-                  <p className="text-xs text-gray-400 mb-0.5">Lemak</p>
-                  <p className="text-sm font-black text-yellow-600">
-                    {menu?.fat || "-"} <span className="text-xs font-normal">g</span>
-                  </p>
-                </div>
-                <div className="bg-red-50 rounded-2xl p-3 text-center">
-                  <p className="text-xs text-gray-400 mb-0.5">Zat Besi</p>
-                  <p className="text-sm font-black text-red-500">
-                    {menu?.iron || "-"} <span className="text-xs font-normal">mg</span>
-                  </p>
-                </div>
-                <div className="bg-purple-50 rounded-2xl p-3 text-center">
-                  <p className="text-xs text-gray-400 mb-0.5">Seng</p>
-                  <p className="text-sm font-black text-purple-600">
-                    {menu?.zinc || "-"} <span className="text-xs font-normal">mg</span>
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Deskripsi */}
-            {(menu?.description || menu?.deskripsi) && (
-              <div>
-                <p className="text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">
-                  Deskripsi
-                </p>
-                <p className="text-sm text-gray-600 leading-relaxed">
-                  {menu?.description || menu?.deskripsi}
-                </p>
-              </div>
-            )}
-
-            {/* Bahan Masakan */}
-            {(menu?.bahan_masakan || menu?.ingredients?.length > 0) && (
-              <div>
-                <p className="text-xs font-black text-gray-500 uppercase tracking-wider mb-2">
-                  🥕 Bahan Masakan
-                </p>
-                {menu?.bahan_masakan ? (
-                  <p className="text-sm text-gray-600 bg-gray-50 rounded-xl p-3 leading-relaxed">
-                    {menu.bahan_masakan}
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {menu?.ingredients?.map((ing, i) => (
-                      <span
-                        key={i}
-                        className="bg-gray-100 text-gray-700 text-xs font-bold px-2.5 py-1 rounded-full"
-                      >
-                        {ing?.ingredient?.name || ing?.name || ing}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Cara Membuat */}
-            {(menu?.instructions || menu?.cara_masak) && (
-              <div>
-                <p className="text-xs font-black text-gray-500 uppercase tracking-wider mb-2">
-                  📖 Cara Membuat
-                </p>
-                <p className="text-sm text-gray-600 bg-[#FFF8F0] rounded-xl p-3 leading-relaxed whitespace-pre-line">
-                  {menu?.instructions || menu?.cara_masak}
-                </p>
-              </div>
-            )}
-
-            {/* Tags */}
-            {menu?.tags && (
-              <div>
-                <p className="text-xs font-black text-gray-500 uppercase tracking-wider mb-2">🏷️ Tag</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {menu.tags.split(",").map((tag, i) => (
-                    <span
-                      key={i}
-                      className="bg-[#8B2020]/10 text-[#8B2020] text-xs font-bold px-2.5 py-1 rounded-full"
-                    >
-                      {tag.trim()}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+        <h3 className="text-lg font-black text-gray-800 mb-2">Hapus Perencanaan Menu?</h3>
+        <p className="text-sm text-gray-500 mb-6">Tindakan ini akan menghapus seluruh jadwal mingguan aktif si kecil dari sistem.</p>
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 text-sm font-bold">Batal</button>
+          <button onClick={onConfirm} className="flex-1 py-3 rounded-xl bg-red-600 text-white text-sm font-black hover:bg-red-700 shadow-md">Ya, Hapus</button>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── KOMPONEN: POPUP EDIT ALERGI ──────────────────────────────────────────────
-function AllergyEditPopup({ masterAllergies, selectedIds, onSave, onClose, isSaving }) {
-  const [localIds, setLocalIds] = useState(selectedIds);
-  const toggle = (id) => {
-    setLocalIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
-  };
-  return (
-    <div
-      className="fixed inset-0 z-[500] flex items-end sm:items-center justify-center p-0 sm:p-4"
-      style={{ backdropFilter: "blur(8px)", background: "rgba(0,0,0,0.45)" }}
-      onClick={onClose}
-    >
-      <div
-        className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <div>
-            <h3 className="text-base font-black text-[#8B2020]">⚠️ Edit Alergi / Pantangan</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Pilih satu atau lebih alergi si kecil</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors"
-          >
-            ✕
-          </button>
-        </div>
+function PreferenceEditPopup({ masterAllergies, masterIngredients, childData, onSave, onClose, isSaving }) {
+  const [localAllergyIds, setLocalAllergyIds] = useState(childData.allergies?.map(a => a.allergy_category_id || a.id) || []);
+  const [localPrefIds, setLocalPrefIds] = useState(childData.preferences?.map(p => p.ingredient_id || p.id) || []);
+  const [activeTab, setActiveTab] = useState('allergy'); 
 
-        {/* Daftar alergi */}
-        <div className="overflow-y-auto p-4 space-y-1" style={{ maxHeight: "50vh" }}>
-          {masterAllergies.length === 0 ? (
-            <p className="text-center text-sm text-gray-400 py-8">Data alergi kosong dari server.</p>
-          ) : (
-            masterAllergies.map((a) => {
-              const checked = localIds.includes(a.id);
-              return (
-                <label
-                  key={a.id}
-                  className={`flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all ${
-                    checked
-                      ? "bg-orange-50 border border-orange-200"
-                      : "hover:bg-gray-50 border border-transparent"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggle(a.id)}
-                    className="w-4 h-4 accent-[#8B2020]"
-                  />
-                  <span className={`text-sm font-bold ${checked ? "text-orange-700" : "text-gray-700"}`}>
-                    {formatLabel(a.name)}
-                  </span>
+  const toggleAllergy = (id) => {
+    let newAllergies = [...localAllergyIds];
+    if (newAllergies.includes(id)) newAllergies = newAllergies.filter(a => a !== id);
+    else newAllergies.push(id);
+    
+    const selectedCategories = masterAllergies.filter(a => newAllergies.includes(a.id));
+    const safePreferences = localPrefIds.filter(prefId => {
+      const prefObj = masterIngredients.find(i => i.id === prefId);
+      if (!prefObj) return false;
+      return !selectedCategories.some(cat => {
+        const matchCategory = prefObj.name.toLowerCase().includes(cat.name.toLowerCase());
+        const matchItem = cat.items && cat.items.some(item => prefObj.name.toLowerCase().includes(item.item_name.toLowerCase()) || item.item_name.toLowerCase().includes(prefObj.name.toLowerCase()));
+        return matchCategory || matchItem;
+      });
+    });
+    setLocalAllergyIds(newAllergies);
+    setLocalPrefIds(safePreferences);
+  };
+
+  const togglePref = (id, isDisabled) => {
+    if (isDisabled) return;
+    setLocalPrefIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="flex bg-gray-50 border-b border-gray-100">
+          <button onClick={() => setActiveTab('allergy')} className={`flex-1 py-4 text-sm font-bold ${activeTab === 'allergy' ? 'text-[#8B2020] border-b-2 border-[#8B2020]' : 'text-gray-400'}`}>⚠️ Pantangan</button>
+          <button onClick={() => setActiveTab('preference')} className={`flex-1 py-4 text-sm font-bold ${activeTab === 'preference' ? 'text-green-600 border-b-2 border-green-600' : 'text-gray-400'}`}>🥦 Kesukaan</button>
+        </div>
+        <div className="overflow-y-auto p-4" style={{ maxHeight: "50vh", minHeight: "300px" }}>
+          {activeTab === 'allergy' && (
+            <div className="space-y-1">
+              {masterAllergies.map(a => (
+                <label key={a.id} className="flex items-center gap-3 p-3 rounded-2xl cursor-pointer hover:bg-orange-50 border border-transparent">
+                  <input type="checkbox" checked={localAllergyIds.includes(a.id)} onChange={() => toggleAllergy(a.id)} className="w-4 h-4 accent-[#8B2020]" />
+                  <span className="text-sm font-bold text-gray-700">{formatLabel(a.name)}</span>
                 </label>
-              );
-            })
+              ))}
+            </div>
+          )}
+          {activeTab === 'preference' && (
+            <div className="space-y-1">
+              {masterIngredients.map(i => {
+                const selectedCategories = masterAllergies.filter(a => localAllergyIds.includes(a.id));
+                const isDisabled = selectedCategories.some(cat => {
+                  const matchCategory = i.name.toLowerCase().includes(cat.name.toLowerCase());
+                  const matchItem = cat.items && cat.items.some(item => i.name.toLowerCase().includes(item.item_name.toLowerCase()) || item.item_name.toLowerCase().includes(i.name.toLowerCase()));
+                  return matchCategory || matchItem;
+                });
+                return (
+                  <label key={i.id} className={`flex items-center gap-3 p-3 rounded-2xl ${isDisabled ? "bg-red-50 opacity-60 cursor-not-allowed" : "hover:bg-green-50 cursor-pointer"}`}>
+                    <input type="checkbox" checked={localPrefIds.includes(i.id)} onChange={() => togglePref(i.id, isDisabled)} disabled={isDisabled} className="w-4 h-4 accent-green-600" />
+                    <span className={`text-sm font-bold flex-1 ${isDisabled ? "text-red-700 line-through" : "text-gray-700"}`}>{formatLabel(i.name)}</span>
+                  </label>
+                );
+              })}
+            </div>
           )}
         </div>
-
-        {/* Footer tombol */}
         <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 py-3 rounded-2xl border border-gray-200 text-gray-600 text-sm font-bold hover:bg-gray-50 transition-colors"
-          >
-            Batal
-          </button>
-          <button
-            onClick={() => onSave(localIds)}
-            disabled={isSaving}
-            className="flex-1 py-3 rounded-2xl bg-[#8B2020] text-white text-sm font-black hover:bg-[#6b1020] transition-colors disabled:opacity-50"
-          >
+          <button onClick={onClose} className="flex-1 py-3 rounded-2xl border border-gray-200 text-gray-600 text-sm font-bold">Batal</button>
+          <button onClick={() => onSave(localAllergyIds, localPrefIds)} disabled={isSaving} className="flex-1 py-3 rounded-2xl bg-[#8B2020] text-white text-sm font-black disabled:opacity-50">
             {isSaving ? "Menyimpan..." : "Simpan"}
           </button>
         </div>
@@ -284,675 +160,552 @@ function AllergyEditPopup({ masterAllergies, selectedIds, onSave, onClose, isSav
   );
 }
 
-// ─── KOMPONEN: KARTU MENU SATU HARI ──────────────────────────────────────────
-function MealCard({ label, icon, menu, warna, isPast, onClick }) {
+function SwapMenuPopup({ childId, itemToSwap, onClose, onSwapSuccess, onError }) {
+  const [candidates, setCandidates] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSwapping, setIsSwapping] = useState(false);
+
+  useEffect(() => {
+    const fetchAlts = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_BASE}/mpasi/alternatives/${childId}/${itemToSwap.mealPlanItemId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        setCandidates(data.data || []);
+      } catch {
+        onError("Gagal mencari alternatif pengganti.");
+      } finally { setIsLoading(false); }
+    };
+    fetchAlts();
+  }, [childId, itemToSwap.mealPlanItemId]);
+
+  const handleSwap = async (candidate) => {
+    setIsSwapping(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/mpasi/mealplan/swap/${itemToSwap.mealPlanItemId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          new_recipe_id: candidate.id,
+          new_estimated_cost: candidate.est_price,
+          new_match_score: candidate.match_score
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      onSwapSuccess(data.data); 
+    } catch (err) {
+      onError("Gagal ganti menu: " + err.message);
+    } finally { setIsSwapping(false); }
+  };
+
   return (
-    <div
-      onClick={!isPast ? onClick : undefined}
-      className={`group flex items-center gap-3 rounded-2xl border p-3 transition-all duration-200 shadow-sm
-        ${
-          isPast
-            ? "bg-gray-50 border-gray-100 opacity-60 cursor-not-allowed"
-            : "bg-white border-gray-100 hover:shadow-md hover:-translate-y-0.5 hover:border-[#8B2020]/20 cursor-pointer"
-        }`}
-    >
-      <div
-        className={`flex-shrink-0 w-11 h-11 rounded-xl ${
-          isPast ? "bg-gray-100" : warna
-        } flex items-center justify-center text-lg shadow-sm overflow-hidden`}
-      >
-        {menu?.image_url && !isPast ? (
-          <img src={menu.image_url} alt="" className="w-11 h-11 object-cover" />
+    <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-black text-[#8B2020]">Pilih Menu Pengganti</h3>
+          <button onClick={onClose} className="w-8 h-8 bg-gray-100 rounded-full font-bold text-gray-500 hover:bg-gray-200">✕</button>
+        </div>
+        {isLoading ? (
+          <div className="text-center py-10"><div className="w-8 h-8 border-4 border-[#8B2020] border-t-transparent rounded-full animate-spin mx-auto"></div></div>
+        ) : candidates.length === 0 ? (
+          <div className="text-center py-10 text-gray-500 text-sm font-medium bg-gray-50 rounded-xl border border-gray-100">
+            Kandidat resep tidak tersedia untuk sisa alokasi anggaran ini.
+          </div>
         ) : (
-          icon
-        )}
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">{label}</p>
-        <p
-          className={`text-sm font-bold truncate transition-colors ${
-            isPast ? "text-gray-400" : "text-gray-800 group-hover:text-[#8B2020]"
-          }`}
-        >
-          {menu?.name || menu?.nama || "Menu tidak tersedia"}
-        </p>
-        <p className={`text-xs ${isPast ? "text-gray-300" : "text-gray-400"}`}>
-          {menu?.calories || menu?.kalori ? `${menu?.calories || menu?.kalori} kkal` : "-"}
-        </p>
-      </div>
-
-      <div className="flex-shrink-0 text-right">
-        <p className={`text-xs font-bold ${isPast ? "text-gray-400" : "text-[#8B2020]"}`}>
-          {formatRupiah(menu?.est_price || menu?.harga || 0)}
-        </p>
-        {!isPast ? (
-          <svg
-            className="w-4 h-4 text-gray-300 group-hover:text-[#8B2020] transition-colors ml-auto mt-0.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        ) : (
-          <span className="text-xs text-gray-300 mt-0.5 block">Lewat</span>
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+            {candidates.map(c => (
+              <div key={c.id} className="flex justify-between items-center border border-gray-100 p-3 rounded-2xl hover:border-orange-200 hover:bg-orange-50">
+                <div>
+                  <p className="text-sm font-bold text-gray-800">{c.name}</p>
+                  <p className="text-xs text-gray-500">{c.calories} kkal · <span className="font-bold text-[#8B2020]">{formatRupiah(c.est_price)}</span></p>
+                </div>
+                <button onClick={() => handleSwap(c)} disabled={isSwapping} className="bg-[#8B2020] text-white text-xs font-bold px-4 py-2 rounded-xl">
+                  {isSwapping ? "..." : "Pilih"}
+                </button>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
   );
 }
 
-// ─── KOMPONEN: TAB HARI ───────────────────────────────────────────────────────
-function DayTab({ label, isActive, isPast, onClick }) {
+function MealCard({ label, icon, menu, warna, onSwap, onDetail, isLocked }) {
   return (
-    <button
-      onClick={onClick}
-      className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-200
-        ${
-          isActive
-            ? "bg-[#8B2020] text-white shadow-md shadow-[#8B2020]/30"
-            : isPast
-            ? "bg-gray-100 text-gray-400 border border-gray-200"
-            : "bg-white text-gray-500 hover:bg-[#8B2020]/10 hover:text-[#8B2020] border border-gray-200"
-        }`}
+    <div 
+      className={`group relative flex items-center gap-3 rounded-2xl border border-gray-100 p-3 transition-all duration-200 
+      ${isLocked ? 'bg-gray-50/70 opacity-60 cursor-not-allowed border-dashed' : 'bg-white shadow-sm hover:shadow-md cursor-pointer'}`} 
+      onClick={!isLocked ? onDetail : undefined}
     >
-      {label}
-    </button>
+      <div className={`flex-shrink-0 w-11 h-11 rounded-xl ${warna} flex items-center justify-center text-lg overflow-hidden ${isLocked && 'grayscale'}`}>
+        {menu?.image_url ? <img src={menu.image_url} alt="" className="w-11 h-11 object-cover" /> : icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">{label}</p>
+        <p className={`text-sm font-bold truncate mt-0.5 ${isLocked ? 'text-gray-500' : 'text-gray-800 group-hover:text-[#8B2020]'}`}>
+          {menu?.name || "Menu tidak tersedia"} {isLocked && <span className="ml-1 text-[10px]">🔒</span>}
+        </p>
+        <p className="text-xs text-gray-400 mt-0.5">
+          {menu?.calories ? `${menu.calories} kkal` : "-"}
+        </p>
+      </div>
+      <div className="flex-shrink-0 text-right pr-12">
+        <p className={`text-xs font-bold ${isLocked ? 'text-gray-400' : 'text-[#8B2020]'}`}>{formatRupiah(menu?.est_price || 0)}</p>
+      </div>
+      {menu && !isLocked && (
+        <button onClick={(e) => { e.stopPropagation(); onSwap(); }} className="absolute right-3 top-1/2 -translate-y-1/2 bg-gray-50 text-gray-400 hover:bg-orange-50 hover:text-orange-600 rounded-full p-2 border border-gray-100 shadow-sm z-10">
+          🔄
+        </button>
+      )}
+    </div>
   );
 }
 
-// ─── KOMPONEN UTAMA: WeeklyPlan ───────────────────────────────────────────────
 export default function WeeklyPlan() {
-  // === STATE UTAMA ===
   const [childData, setChildData] = useState(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasGenerated, setHasGenerated] = useState(false);
-
-  // === STATE TAMPILAN ===
+  
   const [activeDay, setActiveDay] = useState(0);
+  const [currentDayOffset, setCurrentDayOffset] = useState(0);
   const [weeklyMenu, setWeeklyMenu] = useState([]);
-  const [generatedAt, setGeneratedAt] = useState(null);
-  const [aiInsight, setAiInsight] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
-
-  const [budget, setBudget] = useState(158000);
-  const [budgetDisplay, setBudgetDisplay] = useState("");
-
-  // === STATE POPUP DETAIL MENU ===
-  const [detailPopup, setDetailPopup] = useState(null); // { menu, label, icon }
-
-  // === STATE ALERGI ===
-  const [showAllergyEdit, setShowAllergyEdit] = useState(false);
-  const [selectedAllergyIds, setSelectedAllergyIds] = useState([]);
-  const [isSavingAllergy, setIsSavingAllergy] = useState(false);
+  
+  const [budgetMingguan, setBudgetMingguan] = useState("");
+  const [showPrefEdit, setShowPrefEdit] = useState(false);
+  const [isSavingPref, setIsSavingPref] = useState(false);
   const [masterAllergies, setMasterAllergies] = useState([]);
+  const [masterIngredients, setMasterIngredients] = useState([]);
+  
+  const [itemToSwap, setItemToSwap] = useState(null);
+  const [selectedMenuDetail, setSelectedMenuDetail] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [errorModalMsg, setErrorModalMsg] = useState("");
 
-  // ─── LOAD DARI LOCALSTORAGE SAAT MOUNT ─────────────────────────────────────
-  useEffect(() => {
+  const [dynamicDays, setDynamicDays] = useState(["Senin", "Selasa", "Rabu", "Kamis", "Jum'at", "Sabtu", "Minggu"]);
+
+  const componentRef = useRef();
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadPDF = async () => {
+    if (isDownloading) return;
+    const element = componentRef.current;
+    if (!element) return;
+
+    setIsDownloading(true);
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.weeklyMenu && parsed.weeklyMenu.length > 0) {
-          setWeeklyMenu(parsed.weeklyMenu);
-          setGeneratedAt(parsed.generatedAt || null);
-          setAiInsight(parsed.aiInsight || "");
-          setHasGenerated(true);
+      const pages = element.querySelectorAll('.pdf-page');
+      let pdf;
+
+      for (let i = 0; i < pages.length; i++) {
+        const canvas = await html2canvas(pages[i], {
+          scale: 1.5,
+          useCORS: true,
+          logging: false,
+          backgroundColor: "#ffffff"
+        });
+        
+        const imgData = canvas.toDataURL("image/jpeg", 0.75); 
+        
+        // Tetapkan lebar standar A4, dan hitung tingginya secara dinamis
+        const pdfWidth = 210; 
+        const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+        if (i === 0) {
+          // Buat file PDF di mana halaman pertama di-set ukurannya secara dinamis
+          pdf = new jsPDF({
+            orientation: "p",
+            unit: "mm",
+            format: [pdfWidth, imgHeight]
+          });
+          pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, imgHeight, undefined, 'FAST');
+        } else {
+          // Tambahkan halaman berikutnya, juga dengan tinggi yang mengikuti kontennya
+          pdf.addPage([pdfWidth, imgHeight], "p");
+          pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, imgHeight, undefined, 'FAST');
         }
       }
-    } catch (e) {
-      // ignore corrupt storage
-    }
-  }, []);
 
-  // ─── FETCH DATA ANAK & ALERGI SAAT MOUNT ───────────────────────────────────
+      pdf.save(`Katalog_Resep_MPASI_${childData?.name || "Si_Kecil"}.pdf`);
+    } catch (error) {
+      setErrorModalMsg("Gagal mengunduh file PDF. Silakan coba lagi.");
+      console.error(error);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const loadPlanFromBackend = (planItems, createdAt) => {
+    const formatted = [];
+    for (let day = 1; day <= 7; day++) {
+      const dayItems = planItems.filter(item => item.day_number === day);
+      const getRecipeByTime = (time) => {
+        const found = dayItems.find(item => item.meal_time === time);
+        return found ? { ...found.recipe, mealPlanItemId: found.id } : null;
+      };
+      formatted.push({
+        pagi: getRecipeByTime("pagi"),
+        siang: getRecipeByTime("siang"),
+        malam: getRecipeByTime("malam")
+      });
+    }
+    setWeeklyMenu(formatted);
+    setHasGenerated(true);
+
+    if (createdAt) {
+      const startDate = new Date(createdAt);
+      const startDayIndex = startDate.getDay();
+      
+      const reorderedDays = [
+        ...BASE_HARI.slice(startDayIndex),
+        ...BASE_HARI.slice(0, startDayIndex)
+      ];
+      setDynamicDays(reorderedDays);
+
+      const offset = calculateDayOffset(createdAt);
+      setCurrentDayOffset(offset);
+      setActiveDay(Math.max(0, Math.min(6, offset)));
+    } else {
+      setCurrentDayOffset(0);
+      setActiveDay(0);
+      setDynamicDays(["Senin", "Selasa", "Rabu", "Kamis", "Jum'at", "Sabtu", "Minggu"]);
+    }
+  };
+
   useEffect(() => {
-    const fetchChild = async () => {
+    const fetchInit = async () => {
       try {
         const token = localStorage.getItem("token");
         const headers = { Authorization: `Bearer ${token}` };
+        const [resChild, resAlg, resIng] = await Promise.all([
+          fetch(`${API_BASE}/children`, { headers }),
+          fetch(`${API_BASE}/master/allergies`, { headers }),
+          fetch(`${API_BASE}/master/ingredients`, { headers })
+        ]);
+        const dataChild = await resChild.json();
+        setMasterAllergies(await resAlg.json());
+        setMasterIngredients(await resIng.json());
 
-        const res = await fetch(`${API_BASE}/children`, { headers });
-        const data = await res.json();
-        if (data && data.length > 0) {
-          const child = data[0];
+        if (dataChild?.length > 0) {
+          const child = dataChild[0];
           setChildData(child);
-
-          if (child.optimal_budget_cache) {
-            const weeklyBudget = Math.round(parseFloat(child.optimal_budget_cache) / 4);
-            setBudget(weeklyBudget);
-            setBudgetDisplay(new Intl.NumberFormat("id-ID").format(weeklyBudget));
+          
+          // Render item menu mingguan murni untuk kebutuhan pemetaan visual saja
+          const activeWeeklyPlan = child.meal_plans?.find(p => p.plan_type === 'mingguan');
+          if (activeWeeklyPlan) {
+            loadPlanFromBackend(activeWeeklyPlan.items, activeWeeklyPlan.created_at);
           }
 
-          if (child.allergies) {
-            const allergyIds = child.allergies.map((a) => a.allergy_category_id || a.id);
-            setSelectedAllergyIds(allergyIds);
+          // PERUBAHAN KRITIKAL: Anggaran mingguan murni diturunkan dari actual cost BULANAN (dibagi 4)
+          const activeBulananPlan = child.meal_plans?.find(p => p.plan_type === "Bulanan");
+          if (activeBulananPlan && activeBulananPlan.actual_total_cost) {
+            setBudgetMingguan(Math.round(parseFloat(activeBulananPlan.actual_total_cost) / 4));
+          } else if (child.optimal_budget_cache) {
+            const mlDaily = parseFloat(child.optimal_budget_cache) / 30;
+            setBudgetMingguan(Math.round(mlDaily * 7));
           }
         }
-
-        const allergyRes = await fetch(`${API_BASE}/master/allergies`, { headers });
-        const allergyData = await allergyRes.json();
-        setMasterAllergies(allergyData);
-      } catch (err) {
-        console.error("Gagal fetch data anak:", err);
-      } finally {
-        setIsLoadingData(false);
-      }
+      } catch (err) { console.error(err); } finally { setIsLoadingData(false); }
     };
-    fetchChild();
+    fetchInit();
   }, []);
 
-  // ─── HANDLER: GENERATE REKOMENDASI ─────────────────────────────────────────
-  const handleGenerate = useCallback(async () => {
+  const handleGenerate = async () => {
     if (!childData?.id) return;
-    setIsGenerating(true);
-    setErrorMsg("");
+    
+    // 1. VALIDASI: Cegah generate ulang jika menu sudah ada
+    if (hasGenerated) {
+      setErrorModalMsg("Jadwal mingguan sudah ada! Silakan klik tombol '🗑️ Reset' terlebih dahulu jika ingin menyusun jadwal baru.");
+      return;
+    }
 
+    if (!budgetMingguan || parseFloat(budgetMingguan) <= 0) {
+      setErrorModalMsg("Masukkan nominal anggaran belanja valid.");
+      return;
+    }
+    
+    setIsGenerating(true);
     try {
       const token = localStorage.getItem("token");
-
       const res = await fetch(`${API_BASE}/mpasi/generate-weekly/${childData.id}`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ budget }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ custom_budget: parseFloat(budgetMingguan) })
       });
+      const responseData = await res.json();
+      if (!res.ok) throw new Error(responseData.message);
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Gagal generate rekomendasi.");
-
-      let insight = "";
-      if (data.insight?.ai_insight_text) insight = data.insight.ai_insight_text;
-      else if (data.ai_insight_text) insight = data.ai_insight_text;
-      setAiInsight(insight);
-
-      // EXTRACTION: Menangkap array data resep dari berbagai shape response backend
-      let serverWeeklyPlan = null;
-      if (Array.isArray(data)) serverWeeklyPlan = data;
-      else if (data.weeklyPlan && Array.isArray(data.weeklyPlan)) serverWeeklyPlan = data.weeklyPlan;
-      else if (data.weeklyMenu && Array.isArray(data.weeklyMenu)) serverWeeklyPlan = data.weeklyMenu;
-      else if (data.data && Array.isArray(data.data)) serverWeeklyPlan = data.data;
-      else if (data.plan && Array.isArray(data.plan)) serverWeeklyPlan = data.plan;
-
-      if (serverWeeklyPlan && serverWeeklyPlan.length > 0) {
-        const now = new Date().toISOString();
-        setWeeklyMenu(serverWeeklyPlan);
-        setGeneratedAt(now);
-        setHasGenerated(true);
-        setActiveDay(0);
-
-        // Simpan ke localStorage supaya tidak hilang saat pindah halaman
-        localStorage.setItem(
-          STORAGE_KEY,
-          JSON.stringify({ weeklyMenu: serverWeeklyPlan, generatedAt: now, aiInsight: insight })
-        );
+      if (responseData.data && responseData.data.items) {
+        loadPlanFromBackend(responseData.data.items, responseData.data.created_at);
       } else {
-        throw new Error("Data menu mingguan kosong atau format respons JSON dari backend belum sesuai.");
+        setErrorModalMsg("Gagal membaca struktur menu AI.");
       }
-    } catch (err) {
-      console.error("Error generate:", err);
-      setErrorMsg(err.message || "Terjadi kesalahan saat menghubungi server.");
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [childData, budget]);
+    } catch (err) { setErrorModalMsg(err.message); } finally { setIsGenerating(false); }
+  };
 
-  // ─── HANDLER: SIMPAN ALERGI ─────────────────────────────────────────────────
-  const handleSaveAllergy = async (newIds) => {
-    if (!childData?.id) return;
-    setIsSavingAllergy(true);
+  const handleSavePref = async (allergyIds, prefIds) => {
+    setIsSavingPref(true);
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${API_BASE}/children/${childData.id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ allergy_ids: newIds }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ allergy_ids: allergyIds, preference_ids: prefIds }),
       });
-      if (!res.ok) throw new Error("Gagal menyimpan alergi.");
-      setSelectedAllergyIds(newIds);
+      const data = await res.json();
+      if (res.ok) {
+        setChildData(data.data);
+        setShowPrefEdit(false);
+      } else throw new Error(data.message);
+    } catch (err) { setErrorModalMsg(err.message || "Gagal menyimpan data preferensi."); } finally { setIsSavingPref(false); }
+  };
 
-      const updatedAllergies = masterAllergies
-        .filter((a) => newIds.includes(a.id))
-        .map((a) => ({
-          id: a.id,
-          allergy_category_id: a.id,
-          allergy_category: { name: a.name },
-          name: a.name,
-        }));
-      setChildData((prev) => ({ ...prev, allergies: updatedAllergies }));
-      setShowAllergyEdit(false);
-    } catch (err) {
-      alert("Gagal menyimpan alergi: " + err.message);
-    } finally {
-      setIsSavingAllergy(false);
+  const handleExecuteDelete = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      await fetch(`${API_BASE}/mpasi/weekly/${childData.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setWeeklyMenu([]);
+      setHasGenerated(false);
+      setShowDeleteModal(false);
+      setCurrentDayOffset(0);
+      setActiveDay(0);
+    } catch { 
+      setErrorModalMsg("Gagal mereset jadwal mingguan."); 
     }
   };
 
-  // ─── KALKULASI TOTAL HARGA MINGGUAN ────────────────────────────────────────
-  const totalMingguan = weeklyMenu.reduce(
-    (sum, hari) =>
-      sum +
-      (hari?.pagi?.est_price || hari?.pagi?.harga || 0) +
-      (hari?.siang?.est_price || hari?.siang?.harga || 0) +
-      (hari?.malam?.est_price || hari?.malam?.harga || 0),
-    0
-  );
-  const selisihBudget = budget - totalMingguan;
+  const handleBudgetInputChange = (e) => {
+    const rawValue = e.target.value.replace(/\D/g, "");
+    setBudgetMingguan(rawValue ? parseInt(rawValue) : 0);
+  };
 
-  // ─── RENDER ─────────────────────────────────────────────────────────────────
+  let sumCal = 0, sumPro = 0, sumFat = 0;
+  if (hasGenerated && weeklyMenu.length > 0) {
+    weeklyMenu.forEach(hari => {
+      ["pagi", "siang", "malam"].forEach(waktu => {
+        if (hari[waktu]) {
+          sumCal += parseFloat(hari[waktu].calories) || 0;
+          sumPro += parseFloat(hari[waktu].protein) || 0;
+          sumFat += parseFloat(hari[waktu].fat) || 0;
+        }
+      });
+    });
+  }
+  const avgCal = Math.round(sumCal / 7);
+  const avgPro = Math.round(sumPro / 7);
+  const avgFat = Math.round(sumFat / 7);
+  const age = getAgeDetail(childData?.dob);
+
+  // Nilai budget cetak PDF ditarik murni dari basis data bulanan aktual dibagi 4
+  const activeBulananPlan = childData?.meal_plans?.find(p => p.plan_type === "Bulanan");
+  const totalMingguanBerbasisBulan = activeBulananPlan && activeBulananPlan.actual_total_cost 
+    ? parseFloat(activeBulananPlan.actual_total_cost) / 4 
+    : (budgetMingguan || 0);
+
+  if (isLoadingData) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#F3EFEA]">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8B2020] border-t-transparent"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex min-h-screen flex-col bg-[#F3EFEA] font-['Lato']">
+    <div className="flex min-h-screen flex-col bg-[#F3EFEA] font-['Lato'] relative">
       <NavbarDashboard />
 
       <main className="flex-1 px-4 py-6 md:px-6 lg:px-10 max-w-7xl mx-auto w-full">
-
-        {/* ── HEADER HALAMAN ──────────────────────────────────────────────── */}
         <div className="mb-6">
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-            <a href="/features" className="hover:text-[#8B2020] transition-colors">Fitur</a>
+            <a
+              href="/features"
+              className="hover:text-[#8B2020] transition-colors"
+            >
+              Fitur
+            </a>
             <span>›</span>
-            <span className="text-[#8B2020] font-bold">Plan Mingguan</span>
+            <span className="text-[#8B2020] font-bold">
+              MPASI Mingguan
+            </span>
           </div>
-          <h1 className="text-2xl md:text-3xl font-black text-[#8B2020] leading-tight">
-            Generator Rekomendasi
-          </h1>
-          <h1 className="text-2xl md:text-3xl font-black text-[#8B2020] leading-tight mb-1">
-            MPASI Mingguan
-          </h1>
-          <p className="text-gray-500 text-sm md:text-base">
-            Dapatkan rekomendasi menu MPASI selama 7 hari yang sesuai dengan kebutuhan si kecil.
-          </p>
+          <h1 className="text-2xl md:text-3xl font-black text-[#8B2020]">MPASI Mingguan</h1>
+          <p className="text-gray-500 text-sm">Dapatkan rekomendasi 21 porsi menu MPASI AI sesuai budget Anda.</p>
         </div>
 
-        {/* ── LAYOUT UTAMA: 2 KOLOM ───────────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-
-          {/* ═══ KOLOM KIRI: FORM INPUT ════════════════════════════════════ */}
           <div className="lg:col-span-2 space-y-4">
-
-            {/* Card: Informasi Si Kecil */}
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5">
-              <h2 className="text-base font-black text-[#8B2020] mb-4 flex items-center gap-2">
-                <span className="w-7 h-7 bg-[#8B2020]/10 rounded-lg flex items-center justify-center text-sm">👶</span>
-                Informasi Si Kecil
-              </h2>
-
-              {isLoadingData ? (
-                <div className="space-y-3 animate-pulse">
-                  <div className="h-10 bg-gray-100 rounded-xl" />
-                  <div className="h-10 bg-gray-100 rounded-xl" />
+            <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
+              <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-3">
+                <h2 className="text-base font-black text-[#8B2020]">Informasi Si Kecil</h2>
+                <button onClick={() => setShowPrefEdit(true)} className="text-[10px] font-black uppercase tracking-wider text-[#8B2020] bg-red-50 px-3 py-1.5 rounded-full border border-red-100 hover:bg-red-100">✏️ Ubah Data</button>
+              </div>
+              <div className="flex justify-between items-center bg-gray-50 p-3 rounded-xl mb-4 border border-gray-100">
+                 <div>
+                    <p className="text-xs text-gray-400 font-bold uppercase mb-0.5">Nama Anak</p>
+                    <p className="text-sm font-black text-gray-800">{childData?.name || "-"}</p>
+                 </div>
+                 <div className="text-right">
+                    <p className="text-xs text-gray-400 font-bold uppercase mb-0.5">Usia</p>
+                    <p className="text-sm font-black text-[#8B2020]">{age.months} Bln {age.days} Hr</p>
+                 </div>
+              </div>
+              <div className="bg-orange-50 rounded-xl p-3 mb-2 border border-orange-100">
+                <p className="text-xs text-orange-600 font-black uppercase mb-2">⚠️ Pantangan</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {childData?.allergies?.length ? childData.allergies.map(a => (
+                    <span key={a.allergy_category?.id} className="bg-white text-orange-700 text-xs font-bold px-2 py-0.5 rounded border border-orange-200">{formatLabel(a.allergy_category?.name)}</span>
+                  )) : <span className="text-xs text-orange-400 italic font-medium">Tidak ada pantangan</span>}
                 </div>
-              ) : childData ? (
-                <div className="space-y-3">
-                  {/* Nama & umur */}
-                  <div className="flex gap-3">
-                    <div className="flex-1 bg-[#F3EFEA] rounded-xl p-3">
-                      <p className="text-xs text-gray-500 mb-1">Nama</p>
-                      <p className="font-bold text-gray-800 text-sm truncate">{childData.name}</p>
-                    </div>
-                    <div className="flex-1 bg-[#F3EFEA] rounded-xl p-3">
-                      <p className="text-xs text-gray-500 mb-1">Usia</p>
-                      <p className="font-bold text-gray-800 text-sm">
-                        {childData.dob
-                          ? `${Math.floor(
-                              (Date.now() - new Date(childData.dob)) / (1000 * 60 * 60 * 24 * 30.44)
-                            )} Bulan`
-                          : "-"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Alergi + tombol Ubah */}
-                  <div className="bg-orange-50 border border-orange-100 rounded-xl p-3">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <p className="text-xs text-orange-600 font-bold">⚠️ Alergi / Pantangan</p>
-                      <button
-                        onClick={() => setShowAllergyEdit(true)}
-                        className="text-xs font-black text-[#8B2020] bg-white border border-[#8B2020]/20 px-2.5 py-1 rounded-full
-                          hover:bg-[#8B2020] hover:text-white transition-all duration-200"
-                      >
-                        ✏️ Ubah
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {childData?.allergies && childData.allergies.length > 0 ? (
-                        childData.allergies.map((a) => (
-                          <span
-                            key={a.allergy_category_id || a.id}
-                            className="bg-orange-100 text-orange-700 text-xs font-bold px-2.5 py-1 rounded-full"
-                          >
-                            {a.allergy_category?.name || a.name}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-xs text-orange-400 italic">Belum ada alergi terdaftar</span>
-                      )}
-                    </div>
-                  </div>
+              </div>
+              <div className="bg-green-50 rounded-xl p-3 border border-green-100">
+                <p className="text-xs text-green-700 font-black uppercase mb-2">🥦 Kesukaan</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {childData?.preferences?.length ? childData.preferences.map(p => (
+                    <span key={p.ingredient?.id} className="bg-white text-green-700 text-xs font-bold px-2 py-0.5 rounded border border-green-200">{formatLabel(p.ingredient?.name)}</span>
+                  )) : <span className="text-xs text-green-500 italic font-medium">Belum ada kesukaan</span>}
                 </div>
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-gray-400 text-sm">Data anak belum tersedia.</p>
-                  <a href="/dashboard" className="text-[#8B2020] text-xs font-bold hover:underline">
-                    Daftarkan anak →
-                  </a>
-                </div>
-              )}
+              </div>
             </div>
 
-            {/* Card: Budget Mingguan */}
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5">
-              <h2 className="text-base font-black text-[#8B2020] mb-4 flex items-center gap-2">
-                <span className="w-7 h-7 bg-[#8B2020]/10 rounded-lg flex items-center justify-center text-sm">💰</span>
-                Budget Mingguan
-              </h2>
-
-              <label className="text-xs font-bold text-gray-600 mb-1.5 block">Masukkan Budget</label>
-              <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-[#8B2020] focus-within:ring-2 focus-within:ring-[#8B2020]/10 transition-all">
-                <span className="px-3 text-sm text-gray-400 font-bold bg-gray-50 py-3 border-r border-gray-200">Rp</span>
-                <input
+            <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 text-center relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1 bg-[#8B2020]"></div>
+              <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2 mt-2">Alokasi Anggaran Mingguan AI</p>
+              <div className="flex items-center justify-center bg-gray-50 border border-gray-200 rounded-2xl px-4 py-2.5 max-w-xs mx-auto">
+                <span className="text-xl font-black text-[#8B2020] mr-1.5">Rp</span>
+                <input 
                   type="text"
                   inputMode="numeric"
-                  value={budgetDisplay}
-                  onChange={(e) => {
-                    const raw = e.target.value.replace(/\./g, "");
-                    if (!/^\d*$/.test(raw)) return;
-                    const num = Number(raw);
-                    setBudget(num);
-                    setBudgetDisplay(new Intl.NumberFormat("id-ID").format(num));
-                  }}
-                  placeholder="Contoh: 150.000"
-                  className="flex-1 px-3 py-3 text-sm font-bold text-gray-800 outline-none bg-white"
+                  className="w-full text-2xl font-black text-gray-800 bg-transparent outline-none tracking-wide"
+                  value={budgetMingguan ? Number(budgetMingguan).toLocaleString("id-ID") : ""}
+                  onChange={handleBudgetInputChange}
                 />
               </div>
+              <p className="text-[10px] text-gray-400 font-medium mt-3 leading-relaxed">
+                Ditranslasikan dari basis data utama anggaran bulanan kecerdasan buatan (ML Actual Cost).
+              </p>
+            </div>
 
-              {childData?.optimal_budget_cache && (
-                <div className="mt-3 flex items-center gap-2 bg-green-50 border border-green-100 rounded-xl p-3">
-                  <span className="text-green-500 text-base">✅</span>
-                  <div>
-                    <p className="text-xs text-green-700 font-bold">Rekomendasi AI</p>
-                    <p className="text-xs text-green-600">
-                      {formatRupiah(Math.round(parseFloat(childData.optimal_budget_cache) / 4))} / minggu
-                    </p>
+            {hasGenerated && (
+               <div className="bg-[#FFF8F0] rounded-3xl p-5 shadow-sm border border-orange-100">
+                  <h3 className="text-sm font-black text-gray-800 mb-3 text-center border-b border-orange-100 pb-2">Rata-rata Nutrisi Harian AI</h3>
+                  <div className="flex justify-between items-center">
+                     <div className="text-center flex-1">
+                        <p className="text-lg font-black text-orange-600">{avgCal}</p>
+                        <p className="text-[10px] font-bold text-gray-500 uppercase">Kalori</p>
+                     </div>
+                     <div className="w-px h-8 bg-orange-200"></div>
+                     <div className="text-center flex-1">
+                        <p className="text-lg font-black text-blue-600">{avgPro}g</p>
+                        <p className="text-[10px] font-bold text-gray-500 uppercase">Protein</p>
+                     </div>
+                     <div className="w-px h-8 bg-orange-200"></div>
+                     <div className="text-center flex-1">
+                        <p className="text-lg font-black text-green-600">{avgFat}g</p>
+                        <p className="text-[10px] font-bold text-gray-500 uppercase">Lemak</p>
+                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-
-            {/* Card: Catatan */}
-            <div className="bg-[#FFF8F0] rounded-3xl border border-orange-100 p-5">
-              <h3 className="text-sm font-black text-[#8B2020] mb-3 flex items-center gap-2">
-                <span>📋</span> Catatan
-              </h3>
-              <ul className="space-y-2 text-xs text-gray-600">
-                {[
-                  "Pastikan tekstur makanan sesuai dengan kemampuan makan si kecil.",
-                  "Perkenalkan satu bahan baru dalam 3-4 hari untuk memantau alergi.",
-                  "ASI tetap menjadi sumber nutrisi hingga usia 2 tahun.",
-                ].map((note, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#8B2020] mt-1.5 flex-shrink-0" />
-                    {note}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Tombol Generate */}
-            <button
-              onClick={handleGenerate}
-              disabled={isGenerating || !childData || isLoadingData}
-              className="w-full bg-[#8B2020] text-white font-black text-sm py-4 rounded-2xl
-                shadow-lg shadow-[#8B2020]/30 transition-all duration-300
-                hover:bg-[#6b1020] hover:shadow-xl hover:shadow-[#8B2020]/40 hover:-translate-y-0.5
-                active:translate-y-0 active:shadow-md
-                disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none
-                flex items-center justify-center gap-2"
-            >
-              {isGenerating ? (
-                <>
-                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  Sedang Diproses AI...
-                </>
-              ) : (
-                <>✨ Buat Rekomendasi AI</>
-              )}
-            </button>
-
-            {errorMsg && (
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
-                <p className="text-red-600 text-xs font-bold">⚠️ {errorMsg}</p>
-              </div>
+               </div>
             )}
+
+            <button onClick={handleGenerate} disabled={isGenerating || !childData} className="w-full bg-[#8B2020] text-white font-black text-sm py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2">
+              {isGenerating ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : "✨ Susun Jadwal Menu Baru AI"}
+            </button>
           </div>
 
-          {/* ═══ KOLOM KANAN: HASIL REKOMENDASI ═══════════════════════════ */}
           <div className="lg:col-span-3 space-y-4">
-
-            {/* Card: Plan Mingguan */}
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-
-              {/* Header card */}
-              <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-base font-black text-gray-800">Rekomendasi MPASI Mingguan</h2>
-                  <span className="bg-[#8B2020] text-white text-xs font-black px-2.5 py-1 rounded-full">7 Hari</span>
-                </div>
+            <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 min-h-[500px]">
+              <div className="flex flex-col sm:flex-row justify-between items-center border-b border-gray-100 pb-4 mb-4 gap-3">
+                <h2 className="text-base font-black text-gray-800 flex items-center gap-2">
+                   📅 Rencana Jadwal 7 Hari
+                </h2>
                 {hasGenerated && (
-                  <button
-                    className="flex items-center gap-1.5 text-xs font-bold text-[#8B2020] border border-[#8B2020]/30
-                    px-3 py-2 rounded-xl hover:bg-[#8B2020]/5 transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path
-                        strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
-                    Unduh PDF
-                  </button>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={handleDownloadPDF} 
+                      disabled={isDownloading}
+                      className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl"
+                    >
+                      {isDownloading ? "⏳ Mengunduh..." : "📄 Unduh PDF Katalog"}
+                    </button>
+                    <button onClick={() => setShowDeleteModal(true)} className="text-xs font-bold text-red-700 bg-red-50 border border-red-200 px-4 py-2 rounded-xl">
+                      🗑️ Reset
+                    </button>
+                  </div>
                 )}
               </div>
 
-              {/* Tab navigasi hari (Senin–Minggu) */}
-              {hasGenerated && (
-                <div className="px-5 py-3 border-b border-gray-100">
-                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                    {HARI.map((hari, idx) => {
-                      const past = isDayPast(idx, generatedAt);
+              {!hasGenerated ? (
+                <div className="text-center py-24 flex flex-col items-center">
+                   <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center text-3xl mb-4 shadow-inner grayscale opacity-50">🍱</div>
+                   <h3 className="font-bold text-gray-600 mb-1">Jadwal Belum Tersusun</h3>
+                   <p className="text-xs text-gray-400 max-w-xs leading-relaxed">Klik tombol susun jadwal di sebelah kiri untuk men-generate otomatis matriks rencana makan.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-2 overflow-x-auto pb-3 mb-4 scrollbar-hide">
+                    {dynamicDays.map((h, i) => {
+                      const isPastDay = i < currentDayOffset;
                       return (
-                        <DayTab
-                          key={hari}
-                          label={hari}
-                          isActive={activeDay === idx}
-                          isPast={past}
-                          onClick={() => setActiveDay(idx)}
+                        <button key={h} onClick={() => setActiveDay(i)} className={`px-5 py-2.5 rounded-xl text-xs font-black whitespace-nowrap transition-all flex items-center gap-1
+                          ${activeDay === i ? "bg-[#8B2020] text-white shadow-md" : "bg-gray-50 text-gray-500 border border-gray-200"} 
+                          ${isPastDay ? "opacity-60" : ""}`}>
+                          {h} {isPastDay && <span className="text-[10px]">🔒</span>}
+                          {i === currentDayOffset && <span className="ml-1 bg-green-100 text-green-700 text-[9px] px-1.5 py-0.5 rounded-full border border-green-200">HARI INI</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="space-y-3">
+                    {[
+                      { slot: "pagi", label: "Sarapan Pagi (08:00)", icon: "☀️", warna: "bg-amber-50 text-amber-600" },
+                      { slot: "siang", label: "Makan Siang (12:00)", icon: "🌤️", warna: "bg-orange-50 text-orange-600" },
+                      { slot: "malam", label: "Makan Malam (19:00)", icon: "🌙", warna: "bg-indigo-50 text-indigo-600" }
+                    ].map(({ slot, label, icon, warna }) => {
+                      const menu = weeklyMenu[activeDay]?.[slot];
+                      const isLocked = activeDay < currentDayOffset;
+                      return (
+                        <MealCard 
+                          key={slot} label={label} icon={icon} menu={menu} warna={warna} 
+                          isLocked={isLocked}
+                          onSwap={() => setItemToSwap(menu)}
+                          onDetail={() => setSelectedMenuDetail(menu)} 
                         />
                       );
                     })}
                   </div>
-                </div>
+                </>
               )}
-
-              {/* Isi: Menu Hari Aktif / State Kosong */}
-              <div className="p-5">
-                {!hasGenerated || weeklyMenu.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <div className="w-20 h-20 bg-[#F3EFEA] rounded-3xl flex items-center justify-center text-4xl mb-4 animate-bounce">
-                      🍱
-                    </div>
-                    <h3 className="text-lg font-black text-gray-700 mb-2">Menu Mingguan Belum Dibuat</h3>
-                    <p className="text-sm text-gray-400 max-w-xs">
-                      Atur budget di kiri, lalu klik <strong>"Buat Rekomendasi AI"</strong> untuk mendapatkan
-                      menu MPASI 7 hari yang dipersonalisasi.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {/* Header hari aktif */}
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-lg font-black text-gray-800">{HARI[activeDay]}</h3>
-                          {isDayPast(activeDay, generatedAt) && (
-                            <span className="text-xs bg-gray-100 text-gray-400 font-bold px-2 py-0.5 rounded-full">
-                              Sudah Lewat
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-gray-400">
-                          3 waktu makan ·{" "}
-                          {formatRupiah(
-                            (weeklyMenu[activeDay]?.pagi?.est_price || weeklyMenu[activeDay]?.pagi?.harga || 0) +
-                            (weeklyMenu[activeDay]?.siang?.est_price || weeklyMenu[activeDay]?.siang?.harga || 0) +
-                            (weeklyMenu[activeDay]?.malam?.est_price || weeklyMenu[activeDay]?.malam?.harga || 0)
-                          )}{" "}
-                          / hari
-                        </p>
-                      </div>
-                      {/* Navigasi prev/next */}
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setActiveDay(Math.max(0, activeDay - 1))}
-                          disabled={activeDay === 0}
-                          className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center
-                            hover:bg-[#8B2020]/10 hover:text-[#8B2020] disabled:opacity-30 disabled:cursor-not-allowed
-                            transition-colors text-gray-600"
-                        >‹</button>
-                        <button
-                          onClick={() => setActiveDay(Math.min(6, activeDay + 1))}
-                          disabled={activeDay === 6}
-                          className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center
-                            hover:bg-[#8B2020]/10 hover:text-[#8B2020] disabled:opacity-30 disabled:cursor-not-allowed
-                            transition-colors text-gray-600"
-                        >›</button>
-                      </div>
-                    </div>
-
-                    {/* 3 kartu menu: Pagi, Siang, Malam */}
-                    <div className="space-y-3">
-                      {[
-                        { slot: "pagi", label: "Sarapan · 08:00", icon: "☀️", warna: "bg-amber-50" },
-                        { slot: "siang", label: "Makan Siang · 12:00", icon: "🌤️", warna: "bg-orange-50" },
-                        { slot: "malam", label: "Makan Malam · 19:00", icon: "🌙", warna: "bg-indigo-50" },
-                      ].map(({ slot, label, icon, warna }) => {
-                        const menu = weeklyMenu[activeDay]?.[slot];
-                        const past = isDayPast(activeDay, generatedAt);
-                        return (
-                          <MealCard
-                            key={slot}
-                            label={label}
-                            icon={icon}
-                            menu={menu}
-                            warna={warna}
-                            isPast={past}
-                            onClick={() => setDetailPopup({ menu, label, icon })}
-                          />
-                        );
-                      })}
-                    </div>
-
-                    {/* Banner hari lewat */}
-                    {isDayPast(activeDay, generatedAt) && (
-                      <div className="bg-gray-50 border border-gray-100 rounded-2xl p-3 text-center">
-                        <p className="text-xs text-gray-400 font-bold">
-                          📅 Menu hari ini sudah lewat dan tidak bisa diklik.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
             </div>
-
-            {/* Card: Ringkasan Budget & AI Insight */}
-            {hasGenerated && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5">
-                  <h3 className="text-sm font-black text-gray-700 mb-4">💳 Ringkasan Budget</h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-gray-500">Budget Kamu</span>
-                      <span className="text-sm font-black text-gray-800">{formatRupiah(budget)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-gray-500">Total Menu AI</span>
-                      <span className="text-sm font-black text-gray-800">{formatRupiah(totalMingguan)}</span>
-                    </div>
-                    <div className="h-px bg-gray-100" />
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-gray-600">
-                        {selisihBudget >= 0 ? "💚 Hemat" : "⚠️ Melebihi"}
-                      </span>
-                      <span className={`text-sm font-black ${selisihBudget >= 0 ? "text-green-600" : "text-red-500"}`}>
-                        {selisihBudget >= 0 ? "+" : ""}{formatRupiah(selisihBudget)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <div className="flex justify-between text-xs text-gray-400 mb-1.5">
-                      <span>Terpakai</span>
-                      <span>{Math.min(100, Math.round((totalMingguan / budget) * 100))}%</span>
-                    </div>
-                    <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-700 ${
-                          totalMingguan <= budget ? "bg-green-500" : "bg-red-400"
-                        }`}
-                        style={{ width: `${Math.min(100, (totalMingguan / budget) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {aiInsight && (
-                  <div className="bg-gradient-to-br from-[#8B2020] to-[#c0392b] rounded-3xl shadow-sm p-5">
-                    <h3 className="text-sm font-black text-white mb-3">✨ Insight AI</h3>
-                    <p className="text-xs text-white/80 leading-relaxed">{aiInsight}</p>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
       </main>
 
+      {showPrefEdit && <PreferenceEditPopup masterAllergies={masterAllergies} masterIngredients={masterIngredients} childData={childData} isSaving={isSavingPref} onSave={handleSavePref} onClose={() => setShowPrefEdit(false)} />}
+      {itemToSwap && <SwapMenuPopup childId={childData.id} itemToSwap={itemToSwap} onClose={() => setItemToSwap(null)} onSwapSuccess={(newPlan) => { setWeeklyMenu(newPlan); setItemToSwap(null); }} onError={(msg) => { setItemToSwap(null); setErrorModalMsg(msg); }} />}
+      {selectedMenuDetail && <RecipeDetailPopup menu={selectedMenuDetail} onClose={() => setSelectedMenuDetail(null)} />}
+      <DeleteConfirmationModal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} onConfirm={handleExecuteDelete} />
+      <ErrorModal message={errorModalMsg} onClose={() => setErrorModalMsg("")} />
+      
+
+      <div style={{ overflow: "hidden", height: 0, width: 0, position: "absolute" }}>
+        <PrintableWeeklyPlan 
+          ref={componentRef} 
+          childData={childData} 
+          weeklyMenu={weeklyMenu} 
+          totalMingguan={totalMingguanBerbasisBulan} 
+          dynamicDays={dynamicDays} 
+        />
+      </div>
+      
       <FooterDashboard />
-
-      {/* ─── POPUP DETAIL MENU ──────────────────────────────────────────────── */}
-      {detailPopup && (
-        <MenuDetailPopup
-          menu={detailPopup.menu}
-          label={detailPopup.label}
-          icon={detailPopup.icon}
-          onClose={() => setDetailPopup(null)}
-        />
-      )}
-
-      {/* ─── POPUP EDIT ALERGI ──────────────────────────────────────────────── */}
-      {showAllergyEdit && (
-        <AllergyEditPopup
-          masterAllergies={masterAllergies}
-          selectedIds={selectedAllergyIds}
-          onSave={handleSaveAllergy}
-          onClose={() => setShowAllergyEdit(false)}
-          isSaving={isSavingAllergy}
-        />
-      )}
     </div>
   );
 }

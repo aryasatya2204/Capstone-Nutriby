@@ -24,7 +24,8 @@
     "express": "^5.2.1",
     "google-auth-library": "^10.6.2",
     "jsonwebtoken": "^9.0.3",
-    "pg": "^8.20.0"
+    "pg": "^8.20.0",
+    "react-to-print": "^3.3.0"
   },
   "devDependencies": {
     "@types/node": "^25.8.0",

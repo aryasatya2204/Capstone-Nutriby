@@ -67,7 +67,7 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
           data.message || "Gagal login, periksa kembali email/password Anda.",
         );
       }
-    } catch (err) {
+    } catch {
       setError("Gagal terhubung ke server.");
     } finally {
       setIsLoading(false);
@@ -95,7 +95,7 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
       } else {
         setError(data.message || "Login Google gagal.");
       }
-    } catch (err) {
+    } catch {
       setError("Server Error.");
     }
   };

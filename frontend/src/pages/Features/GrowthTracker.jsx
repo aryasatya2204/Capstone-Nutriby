@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
+import GrowthPDFTemplate from "./GrowthPDFTemplate";
+import { generatePDF } from "../../helpers/pdfHelper";
 import NavbarDashboard from "../../components/NavbarDashboard";
 import FooterDashboard from "../../components/FooterDashboard";
 
@@ -308,9 +310,18 @@ export default function GrowthTracker() {
   // Update countdown setiap menit berdasarkan data backend
   useEffect(() => {
     if (!childData) return;
-    checkCooldown(childData);
+    
+    // Gunakan setTimeout agar tidak melakukan state update secara sinkron di dalam effect body
+    const timeoutId = setTimeout(() => {
+      checkCooldown(childData);
+    }, 0);
+    
     const interval = setInterval(() => checkCooldown(childData), 60000);
-    return () => clearInterval(interval);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(interval);
+    };
   }, [childData, checkCooldown]);
 
   // ─── FETCH DATA AWAL ─────────────────────────────────────────────────────
@@ -833,10 +844,11 @@ export default function GrowthTracker() {
                   </p>
 
                   <button
-                    className="flex items-center gap-2 bg-white/15 hover:bg-white/25
-                    text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all duration-200
-                    border border-white/20 hover:border-white/40"
-                  >
+  onClick={() => generatePDF("pdf-report-container", `Laporan_Pertumbuhan_${childData?.name || 'Anak'}`)}
+  className="flex items-center gap-2 bg-white/15 hover:bg-white/25
+  text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all duration-200
+  border border-white/20 hover:border-white/40"
+>
                     <svg
                       className="w-3.5 h-3.5"
                       fill="none"
@@ -857,6 +869,11 @@ export default function GrowthTracker() {
             )}
           </div>
         </div>
+        <GrowthPDFTemplate 
+         childData={childData} 
+         chartData={chartData} 
+         latestStatus={latestStatus} 
+      />
       </main>
 
       <FooterDashboard />

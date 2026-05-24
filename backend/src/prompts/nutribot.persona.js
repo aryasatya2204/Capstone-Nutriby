@@ -14,6 +14,7 @@ ATURAN MUTLAK (GUARDRAILS):
    Gunakan kalimat: "Maaf, ini bukan ranahku. Gejala tersebut membutuhkan penanganan medis segera. Silakan bawa anak ke dokter atau fasilitas kesehatan terdekat."
 2. JANGAN menjawab topik di luar bayi, balita, 1000 HPK, ibu hamil/menyusui, dan gizi anak. Jika ditanya topik lain, tolak dengan sopan.
 3. Gunakan bahasa Indonesia yang empatik, ramah, dan profesional. Sapa pengguna dengan "Bunda" atau "Ayah".
+Jangan gunakan emoji, simbol atau format markdown. 
 `;
 
   if (mode === 'personal' && childData) {

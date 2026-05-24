@@ -2,6 +2,55 @@ import { useState, useEffect, useRef } from "react";
 import NavbarDashboard from "../../components/NavbarDashboard";
 import FooterDashboard from "../../components/FooterDashboard";
 
+// --- DATA PREFERENSI PERTANYAAN (SUGGESTIONS) ---
+const SUGGESTIONS = {
+  reguler: [
+    "Berapa porsi dan tekstur makan ideal untuk usia 8 bulan?",
+    "Apa saja sumber zat besi alami yang murah untuk MPASI?",
+    "Kapan bayi boleh mulai minum air putih, dan seberapa banyak?",
+    "Bagaimana cara mengatasi anak yang sedang GTM (Gerakan Tutup Mulut)?",
+  ],
+  personal: [
+    "Apakah target kalori anakku hari ini sudah terpenuhi dengan baik?",
+    "Buatkan ide menu hari ini yang murni 100% aman dari pantangan alergi anakku.",
+    "Berdasarkan nilai Z-Score WFA anakku, apakah tren pertumbuhannya normal?",
+    "Bahan makanan apa yang paling ampuh untuk mengejar ketertinggalan BB anakku?",
+  ],
+};
+
+// --- KOMPONEN TYPEWRITER EFEK MENGETIK ---
+const TypewriterText = ({ text, onTyping }) => {
+  const [displayed, setDisplayed] = useState("");
+
+  useEffect(() => {
+    let i = 0;
+    let currentText = "";
+
+    const timer = setInterval(() => {
+      currentText = text.slice(0, i);
+      setDisplayed(currentText);
+      i++;
+      if (onTyping) onTyping();
+      if (i > text.length) {
+        clearInterval(timer);
+      }
+    }, 5);
+
+    return () => {
+      clearInterval(timer);
+      setDisplayed("");
+    };
+  }, [text]);
+
+  const formatText = (rawText) => {
+    if (!rawText) return { __html: "" };
+    const formatted = rawText.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br />");
+    return { __html: formatted };
+  };
+
+  return <div dangerouslySetInnerHTML={formatText(displayed)} />;
+};
+
 export default function Nutribot() {
   const [childData, setChildData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -10,32 +59,48 @@ export default function Nutribot() {
   const [sessions, setSessions] = useState([]);
   const [activeSession, setActiveSession] = useState(null);
   const [messages, setMessages] = useState([]);
-  
+
   const [activeTab, setActiveTab] = useState("reguler");
   const [inputMessage, setInputMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
-  // State untuk Mobile Sidebar Toggle
+  // State Mobile Sidebar
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
   const chatEndRef = useRef(null);
 
-  // 1. Auto-scroll ke pesan terbaru
-  useEffect(() => {
+  // Auto-scroll helper
+  const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
   }, [messages, isSending]);
 
-  // 2. Fetch Profil Anak & Riwayat Sesi
+  // Load Sessions
+  const loadAllSessions = async (childId, token) => {
+    try {
+      const res = await fetch(`http://localhost:3000/api/bot/sessions/${childId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (Array.isArray(data)) setSessions(data);
+    } catch (error) {
+      console.error("Gagal memuat riwayat", error);
+    }
+  };
+
+  // Inisiasi Fetch Data
   useEffect(() => {
     const initData = async () => {
       try {
         const token = localStorage.getItem("token");
         const resChild = await fetch("http://localhost:3000/api/children", {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         });
         const childArr = await resChild.json();
-        
+
         if (childArr && childArr.length > 0) {
           const child = childArr[0];
           setChildData(child);
@@ -50,47 +115,44 @@ export default function Nutribot() {
     initData();
   }, []);
 
-  const loadAllSessions = async (childId, token) => {
-    try {
-      const res = await fetch(`http://localhost:3000/api/bot/sessions/${childId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      
-      // Pastikan backend mengembalikan array, bukan error message
-      if (Array.isArray(data)) {
-        setSessions(data);
-      }
-    } catch (error) {
-      console.error("Gagal memuat riwayat", error);
-    }
+  // Handle Pindah Tab (Mode)
+  const handleTabChange = (mode) => {
+    if (activeTab === mode) return;
+    setActiveTab(mode);
+    setActiveSession(null);
+    setMessages([]);
+    setIsSidebarOpen(false);
   };
 
-  // 3. Memilih Sesi dan Memuat Pesannya
+  // Memilih Sesi dan Memuat Pesannya
   const selectSession = async (session) => {
     setActiveSession(session);
     setActiveTab(session.mode);
-    setIsSidebarOpen(false); // Tutup sidebar di HP saat sesi dipilih
+    setIsSidebarOpen(false);
     setIsHistoryLoading(true);
-    
+
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`http://localhost:3000/api/bot/session/${session.id}/messages`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       if (res.ok) {
         const data = await res.json();
-        const formattedMessages = data.map(msg => ({
+        const formattedMessages = data.map((msg) => ({
           sender: msg.sender,
-          text: msg.message
+          text: msg.message,
+          isNew: false, // Pesan lama tidak akan diketik ulang
         }));
-        
+
         if (formattedMessages.length === 0) {
-          setMessages([{ 
-            sender: "bot", 
-            text: `Halo! Saya NutriBot. Saat ini kita berada di mode **${session.mode === 'personal' ? 'Personal' : 'Reguler'}**. Ada yang bisa saya bantu terkait gizi atau tumbuh kembang si kecil?` 
-          }]);
+          setMessages([
+            {
+              sender: "bot",
+              text: `Halo! Saya NutriBot. Saat ini kita berada di mode **${session.mode === "personal" ? "Personal" : "Reguler"}**. Ada yang bisa saya bantu terkait gizi atau tumbuh kembang si kecil?`,
+              isNew: false,
+            },
+          ]);
         } else {
           setMessages(formattedMessages);
         }
@@ -102,41 +164,42 @@ export default function Nutribot() {
     }
   };
 
-  // 4. Membuat Sesi Baru
-  const handleCreateNewSession = async (selectedMode = activeTab) => {
+  // Membuat Sesi Baru (Bisa secara manual atau via background)
+  const handleCreateNewSession = async (selectedMode = activeTab, autoSelect = true) => {
     if (!childData) return;
     setIsHistoryLoading(true);
-    
+
     try {
       const token = localStorage.getItem("token");
       const res = await fetch("http://localhost:3000/api/bot/session", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ child_id: childData.id, mode: selectedMode })
+        body: JSON.stringify({ child_id: childData.id, mode: selectedMode }),
       });
-      
+
       const data = await res.json();
       if (res.ok) {
-        setSessions(prev => [data.session, ...prev]);
-        selectSession(data.session);
+        setSessions((prev) => [data.session, ...prev]);
+        if (autoSelect) selectSession(data.session);
+        return data.session;
       } else {
         alert(data.message || "Gagal membuat sesi baru");
       }
-    } catch (error) {
+    } catch {
       alert("Gagal koneksi ke server.");
     } finally {
       setIsHistoryLoading(false);
     }
+    return null;
   };
 
-  // 5. Mengirim Pesan
-  const handleSendMessage = async (e) => {
-    e?.preventDefault();
-    if (!inputMessage.trim() || !activeSession || !activeSession.is_active) return;
+  // Core Fungsi Kirim Pesan ke AI
+  const submitMessage = async (textToSubmit, sessionTarget) => {
+    if (!textToSubmit.trim() || !sessionTarget || !sessionTarget.is_active) return;
 
-    const userText = inputMessage;
-    setInputMessage(""); 
-    setMessages(prev => [...prev, { sender: "user", text: userText }]);
+    setInputMessage("");
+    // Tambahkan pesan user ke UI seketika
+    setMessages((prev) => [...prev, { sender: "user", text: textToSubmit, isNew: false }]);
     setIsSending(true);
 
     try {
@@ -144,47 +207,69 @@ export default function Nutribot() {
       const res = await fetch("http://localhost:3000/api/bot/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ session_id: activeSession.id, message: userText })
+        body: JSON.stringify({ session_id: sessionTarget.id, message: textToSubmit }),
       });
-      
+
       const data = await res.json();
 
       if (res.ok) {
-        setMessages(prev => [...prev, { sender: "bot", text: data.reply }]);
-        setActiveSession(prev => ({ 
-          ...prev, 
+        // Balasan AI ditandai dengan isNew: true agar memicu efek mengetik
+        setMessages((prev) => [...prev, { sender: "bot", text: data.reply, isNew: true }]);
+        setActiveSession((prev) => ({
+          ...prev,
           message_count: prev.message_count + 1,
-          is_active: data.remaining_questions > 0
+          is_active: data.remaining_questions > 0,
         }));
       } else {
         if (res.status === 403) {
-          setActiveSession(prev => ({ ...prev, is_active: false }));
+          setActiveSession((prev) => ({ ...prev, is_active: false }));
         }
-        setMessages(prev => [...prev, { sender: "bot", text: data.message }]);
+        setMessages((prev) => [...prev, { sender: "bot", text: data.message, isNew: true }]);
       }
-      
-      // Refresh list sesi di background untuk update judul percakapan dari kata pertama
-      loadAllSessions(childData.id, token);
 
-    } catch (error) {
-      setMessages(prev => [...prev, { sender: "bot", text: "Gangguan koneksi. Silakan coba lagi." }]);
+      loadAllSessions(childData.id, token);
+    } catch {
+      setMessages((prev) => [...prev, { sender: "bot", text: "Gangguan koneksi. Silakan coba lagi.", isNew: true }]);
     } finally {
       setIsSending(false);
     }
   };
 
-  // Formatter Teks Balasan AI agar rapi (Paragraf & Bold)
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    submitMessage(inputMessage, activeSession);
+  };
+
+  // Handler Klik Pertanyaan Rekomendasi (Fix Race Condition)
+  const handleSuggestionClick = async (text) => {
+    let targetSession = activeSession;
+    
+    // Jika sesi belum ada, buat sesi baru TANPA memicu efek Fetching Messages yang menimpa layar
+    if (!targetSession) {
+      targetSession = await handleCreateNewSession(activeTab, false);
+      setActiveSession(targetSession);
+      // Tulis sapaan awal bot secara lokal (synchronous) agar tidak tertimpa
+      setMessages([
+        {
+          sender: "bot",
+          text: `Halo! Saya NutriBot. Saat ini kita berada di mode **${activeTab === "personal" ? "Personal" : "Reguler"}**. Ada yang bisa saya bantu terkait gizi atau tumbuh kembang si kecil?`,
+          isNew: false,
+        }
+      ]);
+    }
+
+    if (targetSession) {
+      submitMessage(text, targetSession);
+    }
+  };
+
   const formatText = (text) => {
     if (!text) return { __html: "" };
-    // Ubah **teks** jadi bold, dan \n jadi <br>
-    const formatted = text
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\n/g, '<br />');
+    const formatted = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br />");
     return { __html: formatted };
   };
 
-  // Filter Sesi berdasarkan Tab
-  const filteredSessions = sessions.filter(s => s.mode === activeTab);
+  const filteredSessions = sessions.filter((s) => s.mode === activeTab);
   const remainingQuestions = activeSession ? Math.max(0, 5 - activeSession.message_count) : 0;
 
   if (isLoading) {
@@ -196,64 +281,60 @@ export default function Nutribot() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#F4EFEB] font-['Lato']">
+    <div className="flex flex-col h-screen bg-gray-50 font-['Lato'] overflow-hidden">
       <NavbarDashboard />
-      
-      {/* Container utama dengan batas height agar tidak overlap dengan Footer */}
-      <main className="flex-grow flex justify-center p-2 md:p-6 lg:p-8 h-[calc(100vh-80px)]">
+
+      {/* Kontainer Utama Full-Page (100vh penuh) */}
+      <main className="flex-1 flex justify-center w-full md:p-6 lg:p-8 overflow-hidden" style={{ height: '100vh' }}>
         
-        <div className="w-full max-w-[1400px] flex gap-0 md:gap-6 relative h-full">
+        <div className="w-full max-w-[1400px] flex flex-col md:flex-row relative h-full bg-white md:rounded-[2rem] md:shadow-xl md:border border-gray-100 overflow-hidden">
           
           {/* ================= OVERLAY MOBILE ================= */}
           {isSidebarOpen && (
-            <div 
-              className="fixed inset-0 bg-black/40 z-40 md:hidden backdrop-blur-sm transition-opacity"
+            <div
+              className="absolute inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm transition-opacity"
               onClick={() => setIsSidebarOpen(false)}
             />
           )}
 
-          {/* ================= SIDEBAR (MOBILE & DESKTOP) ================= */}
-          {/* MOBILE: Muncul dari kiri (fixed z-50), DESKTOP: Tetap di kiri (shrink-0) */}
-          <div className={`
-            fixed inset-y-0 left-0 z-50 w-72 bg-white flex flex-col h-full shadow-2xl transition-transform duration-300 ease-in-out transform
-            ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-            md:relative md:translate-x-0 md:flex md:w-[320px] md:shrink-0 md:rounded-3xl md:p-5 md:shadow-sm md:border md:border-gray-100
-          `}>
-            
-            {/* Header Sidebar Mobile */}
-            <div className="md:hidden flex justify-between items-center p-5 border-b border-gray-100 bg-white">
-              <span className="font-bold text-[#8B2020] text-lg">Riwayat Percakapan</span>
-              <button onClick={() => setIsSidebarOpen(false)} className="text-gray-500 text-2xl leading-none">&times;</button>
+          {/* ================= SIDEBAR (Fix Height) ================= */}
+          <div
+            className={`absolute md:relative inset-y-0 left-0 z-40 w-4/5 max-w-sm md:w-[320px] bg-[#FAF8F5] flex flex-col h-full shadow-2xl md:shadow-none border-r border-gray-200 transition-transform duration-300 ease-in-out transform ${
+              isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+            }`}
+          >
+            <div className="flex md:hidden justify-between items-center px-5 py-4 border-b border-gray-200 bg-white shrink-0">
+              <span className="font-black text-[#8B2020] text-lg">Riwayat Chat</span>
+              <button onClick={() => setIsSidebarOpen(false)} className="text-gray-500 text-3xl leading-none">&times;</button>
             </div>
 
-            <div className="p-5 md:p-0 border-b border-gray-100 md:border-none pb-4">
-              <button 
+            <div className="p-5 border-b border-gray-200 shrink-0 bg-[#FAF8F5]">
+              <button
                 onClick={() => handleCreateNewSession(activeTab)}
-                className="w-full bg-[#C28C8C] text-white py-3.5 rounded-full font-bold shadow-md hover:bg-[#a67474] transition-all flex items-center justify-center gap-2 border-none outline-none active:scale-95"
+                className="w-full bg-[#C28C8C] text-white py-3.5 rounded-2xl font-black shadow-md hover:bg-[#a67474] transition-all flex items-center justify-center gap-2 active:scale-95"
               >
-                <span>+</span> Sesi Baru
+                <span>+</span> Konsultasi Baru
               </button>
             </div>
 
-            {/* List Sesi yang bisa di-scroll */}
-            <div className="flex-grow overflow-y-auto px-5 md:px-1 mt-2 flex flex-col gap-2 pb-6 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 mt-2 shrink-0 hidden md:block">
-                Riwayat Sesi {activeTab === 'reguler' ? 'Umum' : 'Personal'}
+            <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2 scrollbar-hide">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 mb-1 shrink-0">
+                Riwayat {activeTab === "reguler" ? "Umum" : "Personal"}
               </p>
-              
+
               {filteredSessions.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-6 shrink-0 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                  Belum ada percakapan.
-                </p>
+                <div className="text-center py-10 px-4 bg-white/50 rounded-2xl border border-dashed border-gray-200 mt-2 shrink-0">
+                  <p className="text-xs font-bold text-gray-400">Belum ada riwayat percakapan di mode ini.</p>
+                </div>
               ) : (
-                filteredSessions.map(sess => (
+                filteredSessions.map((sess) => (
                   <button
                     key={sess.id}
                     onClick={() => selectSession(sess)}
-                    className={`shrink-0 text-left p-3.5 rounded-2xl text-sm transition-all truncate border outline-none ${
-                      activeSession?.id === sess.id 
-                      ? 'bg-red-50 border-red-200 text-[#8B2020] font-bold shadow-sm' 
-                      : 'bg-white border-gray-100 text-gray-600 hover:bg-gray-50 hover:border-gray-300'
+                    className={`text-left px-4 py-3.5 rounded-2xl text-sm transition-all truncate border outline-none shrink-0 ${
+                      activeSession?.id === sess.id
+                        ? "bg-white border-red-200 text-[#8B2020] font-black shadow-sm"
+                        : "bg-transparent border-transparent text-gray-600 hover:bg-white hover:border-gray-200 font-medium"
                     }`}
                   >
                     {sess.title || "Percakapan Baru..."}
@@ -263,137 +344,165 @@ export default function Nutribot() {
             </div>
           </div>
 
-          {/* ================= AREA CHAT UTAMA ================= */}
-          <div className="flex-1 flex flex-col min-w-0 bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden h-full relative">
+          {/* ================= AREA CHAT UTAMA (Fix Height & Scroll) ================= */}
+          <div className="flex-1 flex flex-col min-w-0 bg-white h-full relative overflow-hidden">
             
-            {/* HEADER CHAT */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 md:p-5 border-b border-gray-100 gap-4">
-              
-              <div className="flex items-center gap-3 w-full md:w-auto">
-                <button 
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 sm:p-5 border-b border-gray-100 gap-4 shrink-0 bg-white z-10">
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <button
                   onClick={() => setIsSidebarOpen(true)}
                   className="md:hidden bg-gray-100 p-2.5 rounded-xl text-gray-600 hover:bg-gray-200 transition-colors"
                 >
-                  ☰
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                 </button>
-                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl shrink-0">
-                  🤖
-                </div>
+                <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center text-xl shrink-0">🤖</div>
                 <div>
-                  <h1 className="text-lg md:text-xl font-bold text-[#8B2020] leading-tight">NutriBot</h1>
-                  <p className="text-xs text-gray-500">Asisten Gizi Cerdas Anda</p>
+                  <h1 className="text-lg font-black text-[#8B2020] leading-tight">NutriBot AI</h1>
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Klinik Gizi Digital</p>
                 </div>
               </div>
 
-              {/* TABS */}
-              <div className="flex items-center bg-gray-50 rounded-full border border-gray-200 p-1.5 w-full md:w-auto overflow-x-auto shrink-0">
-                <button 
-                  onClick={() => { setActiveTab("reguler"); setIsSidebarOpen(false); }}
-                  className={`flex-1 md:flex-none px-4 py-2 rounded-full text-[13px] md:text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'reguler' ? 'bg-white border border-gray-300 text-[#8B2020] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              <div className="flex items-center bg-gray-100 rounded-xl p-1 w-full sm:w-auto shrink-0 shadow-inner">
+                <button
+                  onClick={() => handleTabChange("reguler")}
+                  className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-black transition-all whitespace-nowrap ${
+                    activeTab === "reguler" ? "bg-white text-[#8B2020] shadow-sm" : "text-gray-500 hover:text-gray-700"
+                  }`}
                 >
-                  Umum (Reguler)
+                  Umum
                 </button>
-                <button 
-                  onClick={() => { setActiveTab("personal"); setIsSidebarOpen(false); }}
-                  className={`flex-1 md:flex-none px-4 py-2 rounded-full text-[13px] md:text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'personal' ? 'bg-[#F4EFEB] text-[#8B2020] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                <button
+                  onClick={() => handleTabChange("personal")}
+                  className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-black transition-all whitespace-nowrap ${
+                    activeTab === "personal" ? "bg-white text-[#8B2020] shadow-sm" : "text-gray-500 hover:text-gray-700"
+                  }`}
                 >
-                  Personal ({childData?.name || 'Anak'})
+                  Personal ({childData?.name || "Anak"})
                 </button>
               </div>
             </div>
 
-            {/* BODY CHAT */}
-            <div className="flex-1 p-4 md:p-6 overflow-y-auto bg-[#FAFAFA] scroll-smooth">
+            {/* Body Chat */}
+            <div className="flex-1 p-4 md:p-6 overflow-y-auto scroll-smooth bg-gray-50/50">
+              
               {isHistoryLoading ? (
                 <div className="flex justify-center items-center h-full">
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-[#C28C8C]"></div>
                 </div>
               ) : !activeSession ? (
-                <div className="flex flex-col justify-center items-center h-full text-center opacity-60 px-4">
-                  <div className="text-5xl mb-4">💬</div>
-                  <p className="text-gray-500 mb-6 max-w-sm">Pilih percakapan dari riwayat atau buat sesi baru untuk berkonsultasi mengenai gizi si kecil.</p>
-                  <button onClick={() => handleCreateNewSession(activeTab)} className="px-6 py-3 bg-[#C28C8C] text-white rounded-full font-bold shadow-md">Mulai Konsultasi Baru</button>
+                <div className="flex flex-col justify-center items-center h-full text-center px-4 animate-fade-in">
+                  <div className="w-20 h-20 bg-white rounded-3xl shadow-sm border border-gray-100 flex items-center justify-center text-4xl mb-6">✨</div>
+                  <h2 className="text-xl md:text-2xl font-black text-gray-800 mb-2">Tanya Seputar Gizi Anak</h2>
+                  <p className="text-sm text-gray-500 mb-8 max-w-md">
+                    Anda berada di mode <span className="font-bold text-[#8B2020]">{activeTab === "reguler" ? "Umum" : "Personal Klinis"}</span>. Pilih salah satu pertanyaan di bawah ini untuk memulai atau ketik sendiri di kolom chat.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl text-left">
+                    {SUGGESTIONS[activeTab].map((suggestText, idx) => (
+                      <button 
+                        key={idx}
+                        onClick={() => handleSuggestionClick(suggestText)}
+                        className="p-4 bg-white border border-gray-200 rounded-2xl hover:border-[#C28C8C] hover:shadow-md transition-all group flex items-start gap-3 active:scale-95 text-left"
+                      >
+                        <span className="text-xl opacity-60 group-hover:opacity-100 transition-opacity">💬</span>
+                        <span className="text-[13px] font-bold text-gray-600 group-hover:text-gray-900 leading-relaxed">
+                          {suggestText}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ) : (
-                <>
+                <div className="space-y-6 pb-4">
                   {messages.map((msg, idx) => (
-                    <div key={idx} className={`mb-6 flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div 
-                        className={`max-w-[90%] md:max-w-[75%] p-4 rounded-3xl text-[14px] md:text-[15px] leading-relaxed shadow-sm break-words ${
-                          msg.sender === 'user' 
-                          ? 'bg-[#F4EFEB] text-gray-800 rounded-br-sm' 
-                          : 'bg-white border border-gray-200 text-gray-800 rounded-bl-sm'
+                    <div key={idx} className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
+                      <div
+                        className={`max-w-[85%] md:max-w-[75%] p-4 md:p-5 rounded-[1.5rem] text-[14px] leading-relaxed shadow-sm break-words ${
+                          msg.sender === "user"
+                            ? "bg-[#F4EFEB] text-gray-800 rounded-br-md"
+                            : "bg-white border border-gray-200 text-gray-800 rounded-bl-md"
                         }`}
-                        dangerouslySetInnerHTML={formatText(msg.text)}
-                      />
+                      >
+                        {/* Jika pesan bot baru, tampilkan dengan typewriter effect */}
+                        {msg.sender === "bot" && msg.isNew ? (
+                          <TypewriterText text={msg.text} onTyping={scrollToBottom} />
+                        ) : (
+                          <div dangerouslySetInnerHTML={formatText(msg.text)} />
+                        )}
+                      </div>
                     </div>
                   ))}
-                  
+
                   {isSending && (
-                    <div className="flex justify-start mb-6">
-                      <div className="bg-white border border-gray-200 text-gray-500 p-4 rounded-3xl rounded-bl-sm shadow-sm flex items-center gap-2">
+                    <div className="flex justify-start">
+                      <div className="bg-white border border-gray-200 text-gray-500 p-5 rounded-[1.5rem] rounded-bl-md shadow-sm flex items-center gap-2">
                         <div className="w-2 h-2 bg-[#C28C8C] rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-[#C28C8C] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                        <div className="w-2 h-2 bg-[#C28C8C] rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                        <div className="w-2 h-2 bg-[#C28C8C] rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+                        <div className="w-2 h-2 bg-[#C28C8C] rounded-full animate-bounce" style={{ animationDelay: "0.4s" }}></div>
                       </div>
                     </div>
                   )}
 
-                  {/* Peringatan Limit 5 Token */}
                   {activeSession && !activeSession.is_active && (
-                    <div className="mt-6 flex flex-col items-center p-5 bg-red-50 border border-red-100 rounded-2xl mx-auto max-w-sm text-center shadow-sm mb-4">
-                      <p className="text-sm text-red-700 font-bold mb-3">Sesi ini telah mencapai batas maksimal (5 pertanyaan).</p>
-                      <button onClick={() => handleCreateNewSession(activeTab)} className="px-6 py-2.5 bg-[#C28C8C] text-white rounded-full text-sm font-bold shadow-md hover:bg-[#a67474] transition-colors active:scale-95">
+                    <div className="mt-8 flex flex-col items-center p-5 bg-red-50 border border-red-100 rounded-3xl mx-auto max-w-sm text-center shadow-sm">
+                      <p className="text-xs text-red-700 font-black mb-3 uppercase tracking-wide">Sesi Konsultasi Berakhir</p>
+                      <p className="text-sm text-gray-600 mb-4 font-medium">Batas maksimal 5 pertanyaan tercapai untuk menjaga konteks obrolan AI.</p>
+                      <button
+                        onClick={() => handleCreateNewSession(activeTab)}
+                        className="px-6 py-2.5 bg-[#C28C8C] text-white rounded-xl text-sm font-black shadow-md hover:bg-[#a67474] transition-colors active:scale-95"
+                      >
                         Buka Konsultasi Baru
                       </button>
                     </div>
                   )}
 
                   <div ref={chatEndRef} />
-                </>
+                </div>
               )}
             </div>
 
-            {/* INPUT AREA */}
-            <div className="p-4 md:p-5 border-t border-gray-100 bg-white shrink-0">
-              {activeSession && (
-                <p className="text-[11px] font-bold text-gray-400 mb-3 ml-2 uppercase tracking-wide">
-                  SISA PERTANYAAN: <span className={remainingQuestions <= 1 ? "text-red-500" : "text-[#8B2020]"}>{remainingQuestions}/5</span>
-                </p>
+            {/* Input Chat Area */}
+            <div className="p-3 md:p-5 bg-white border-t border-gray-100 shrink-0 z-10">
+              {activeSession && activeSession.is_active && (
+                <div className="flex justify-between items-center mb-2 px-1">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                    Mode: <span className="text-[#8B2020]">{activeTab}</span>
+                  </p>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                    Limit: <span className={remainingQuestions <= 1 ? "text-red-500" : "text-[#8B2020]"}>{remainingQuestions}/5</span>
+                  </p>
+                </div>
               )}
-              
-              <form onSubmit={handleSendMessage} className="flex gap-2 md:gap-3 relative">
+
+              <form onSubmit={handleFormSubmit} className="flex gap-2 relative">
                 <input
                   type="text"
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
-                  placeholder="Tanyakan sesuatu tentang gizi si kecil..."
-                  disabled={!activeSession || !activeSession.is_active || isSending || isHistoryLoading}
-                  className="flex-1 min-w-0 bg-[#F6F4F1] border border-transparent focus:border-gray-300 focus:bg-white transition-colors rounded-full px-5 py-3.5 md:py-4 text-sm md:text-base outline-none disabled:opacity-60"
+                  placeholder="Ketik konsultasi gizi..."
+                  disabled={(activeSession && !activeSession.is_active) || isSending || isHistoryLoading}
+                  className="flex-1 w-full bg-gray-50 border border-gray-200 focus:border-[#C28C8C] focus:bg-white transition-colors rounded-2xl px-5 py-3.5 text-sm outline-none disabled:opacity-60"
                 />
                 <button
                   type="submit"
-                  disabled={!activeSession || !activeSession.is_active || isSending || !inputMessage.trim() || isHistoryLoading}
-                  className="bg-[#C28C8C] text-white px-5 md:px-8 py-3.5 md:py-4 rounded-full font-bold hover:bg-[#a67474] transition-all disabled:opacity-50 shrink-0 flex items-center justify-center min-w-[70px] md:min-w-[110px] active:scale-95"
+                  disabled={(activeSession && !activeSession.is_active) || isSending || !inputMessage.trim() || isHistoryLoading}
+                  className="bg-[#C28C8C] text-white px-5 md:px-8 py-3.5 rounded-2xl font-black hover:bg-[#a67474] transition-all disabled:opacity-50 shrink-0 flex items-center justify-center min-w-[60px] md:min-w-[110px] active:scale-95"
                 >
                   {isSending ? (
-                     <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
                   ) : (
                     <>
                       <span className="hidden md:inline">Kirim</span>
-                      <span className="inline md:hidden text-lg leading-none">➤</span>
+                      <svg className="w-5 h-5 inline md:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                     </>
                   )}
                 </button>
               </form>
             </div>
-            
           </div>
         </div>
       </main>
-      
-      {/* Jika kamu ingin menyembunyikan Footer di halaman chat, kamu bisa hapus baris ini */}
-      <FooterDashboard />
+      <FooterDashboard/>
     </div>
   );
 }

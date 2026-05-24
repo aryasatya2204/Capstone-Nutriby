@@ -10,13 +10,6 @@ const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-/**
- * ============================================================================
- * INTERNAL HELPER: ML PIPELINE ENGINE
- * ============================================================================
- * Hanya bertugas mengambil data dan menembak API Machine Learning.
- * Menerima `mlDailyBudget` yang sudah dikalkulasi dengan benar oleh controller.
- */
 const getScoredRecipesFromML = async (childId, mlDailyBudget) => {
   const child = await prisma.child.findUnique({
     where: { id: childId },
@@ -27,19 +20,18 @@ const getScoredRecipesFromML = async (childId, mlDailyBudget) => {
     },
   });
 
-  if (!child || child.growth_logs.length === 0) {
+  if (!child || child.growth_logs.length === 0)
     throw new Error("Data anak atau log pertumbuhan tidak ditemukan.");
-  }
 
   const latestLog = child.growth_logs[0];
   const ageInMonths = getAgeInMonths(child.dob);
   const allergyIds = child.allergies.map((a) => a.allergy_category_id);
-
   const { candidates } = await getSafeCandidateRecipes(ageInMonths, allergyIds);
 
-  if (candidates.length === 0) {
-    throw new Error("Tidak ada kandidat resep yang aman untuk umur dan alergi anak ini.");
-  }
+  if (candidates.length === 0)
+    throw new Error(
+      "Tidak ada kandidat resep yang aman untuk umur dan alergi anak ini.",
+    );
 
   const mlPayload = {
     user: {
@@ -48,7 +40,7 @@ const getScoredRecipesFromML = async (childId, mlDailyBudget) => {
       zscore_wfh: parseFloat(latestLog.zscore_wfh),
       zscore_wfa: parseFloat(latestLog.zscore_wfa),
       zscore_hfa: parseFloat(latestLog.zscore_hfa),
-      daily_budget: mlDailyBudget, 
+      daily_budget: mlDailyBudget,
       target_calories: parseFloat(latestLog.target_kalori),
       target_protein: parseFloat(latestLog.target_protein),
       target_fat: parseFloat(latestLog.target_lemak),
@@ -60,93 +52,87 @@ const getScoredRecipesFromML = async (childId, mlDailyBudget) => {
     recipes: candidates,
   };
 
-  const mlResponse = await axios.post("http://127.0.0.1:8000/recommend", mlPayload);
+  const mlResponse = await axios.post(
+    "http://127.0.0.1:8000/recommend",
+    mlPayload,
+  );
+  const passedRecommendations = mlResponse.data.recommendations.filter(
+    (r) => r.score >= 0.6,
+  );
 
-  const passedRecommendations = mlResponse.data.recommendations.filter((r) => r.score >= 0.6);
+  if (passedRecommendations.length === 0)
+    throw new Error("Model gagal menemukan resep dengan kecocokan memadai.");
 
-  if (passedRecommendations.length === 0) {
-    throw new Error("Model gagal menemukan resep dengan kecocokan di atas 0.6.");
-  }
-
-  const approvedRecipes = passedRecommendations.map(rec => {
-    const detail = candidates.find(c => c.id === rec.recipe_id);
+  const approvedRecipes = passedRecommendations.map((rec) => {
+    const detail = candidates.find((c) => c.id === rec.recipe_id);
     return { ...detail, match_score: rec.score };
   });
 
-  // Urutkan berdasarkan skor tertinggi
   approvedRecipes.sort((a, b) => b.match_score - a.match_score);
-
   return { child, approvedRecipes };
 };
 
-/**
- * ============================================================================
- * 1. GENERATE DAFTAR MENU (Hard Constraint Per Porsi)
- * ============================================================================
- */
 const generateSingleMenu = async (req, res) => {
   try {
     const { childId } = req.params;
-    const { custom_budget } = req.body; 
-
-    // Cari data dasar anak untuk fallback budget
+    const { custom_budget } = req.body;
     const childBase = await prisma.child.findUnique({ where: { id: childId } });
-    if (!childBase) {
+    if (!childBase)
       return res.status(404).json({ message: "Data anak tidak ditemukan." });
-    }
 
-    let budgetPerMenu;
-    let mlDailyBudget;
-
-    // Kalkulasi Budget
+    let budgetPerMenu, mlDailyBudget;
     if (custom_budget !== undefined && custom_budget !== null) {
       budgetPerMenu = parseFloat(custom_budget);
-      mlDailyBudget = budgetPerMenu * 3; // Konversi ke harian untuk ML
+      mlDailyBudget = budgetPerMenu * 3;
     } else {
       mlDailyBudget = parseFloat(childBase.optimal_budget_cache) / 30;
       budgetPerMenu = mlDailyBudget / 3;
     }
 
-    const { approvedRecipes } = await getScoredRecipesFromML(childId, mlDailyBudget);
+    const { approvedRecipes } = await getScoredRecipesFromML(
+      childId,
+      mlDailyBudget,
+    );
+    const filteredRecipes = approvedRecipes.filter(
+      (r) => parseFloat(r.est_price) <= budgetPerMenu,
+    );
 
-    // Hard Constraint Mutlak: Sapu bersih menu yang harganya di atas budgetPerMenu
-    const filteredRecipes = approvedRecipes.filter(r => parseFloat(r.est_price) <= budgetPerMenu);
+    if (filteredRecipes.length === 0)
+      return res
+        .status(404)
+        .json({
+          message: `Maaf, tidak ada resep standar AI yang masuk budget maksimal Rp ${Math.round(budgetPerMenu)}/porsi.`,
+        });
 
-    if (filteredRecipes.length === 0) {
-      return res.status(404).json({ 
-        message: `Maaf, kami tidak menemukan resep yang memenuhi standar gizi dengan budget maksimal Rp ${Math.round(budgetPerMenu)} per porsi.` 
+    res
+      .status(200)
+      .json({
+        message: `Berhasil mendapatkan ${filteredRecipes.length} rekomendasi menu!`,
+        budget_per_menu_applied: budgetPerMenu,
+        data: filteredRecipes,
       });
-    }
-
-    res.status(200).json({
-      message: `Berhasil mendapatkan ${filteredRecipes.length} rekomendasi menu MPASI!`,
-      budget_per_menu_applied: budgetPerMenu,
-      data: filteredRecipes
-    });
-
   } catch (error) {
-    res.status(500).json({ message: "Gagal men-generate menu MPASI", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Gagal men-generate menu MPASI", error: error.message });
   }
 };
 
-/**
- * ============================================================================
- * 2. GENERATE MPASI MINGGUAN (Algoritma Kombinasi Greedy)
- * ============================================================================
- */
 const generateWeeklyPlan = async (req, res) => {
   try {
     const { childId } = req.params;
     const { allergy_ids, preference_ids, custom_budget } = req.body;
 
-    // Update Alergi & Preferensi jika ada
     if (allergy_ids !== undefined || preference_ids !== undefined) {
       await prisma.$transaction(async (tx) => {
         if (allergy_ids !== undefined) {
           await tx.childAllergy.deleteMany({ where: { child_id: childId } });
           if (Array.isArray(allergy_ids) && allergy_ids.length > 0) {
             await tx.childAllergy.createMany({
-              data: allergy_ids.map(id => ({ child_id: childId, allergy_category_id: id }))
+              data: allergy_ids.map((id) => ({
+                child_id: childId,
+                allergy_category_id: id,
+              })),
             });
           }
         }
@@ -154,7 +140,10 @@ const generateWeeklyPlan = async (req, res) => {
           await tx.childPreference.deleteMany({ where: { child_id: childId } });
           if (Array.isArray(preference_ids) && preference_ids.length > 0) {
             await tx.childPreference.createMany({
-              data: preference_ids.map(id => ({ child_id: childId, ingredient_id: id }))
+              data: preference_ids.map((id) => ({
+                child_id: childId,
+                ingredient_id: id,
+              })),
             });
           }
         }
@@ -162,71 +151,63 @@ const generateWeeklyPlan = async (req, res) => {
     }
 
     const childBase = await prisma.child.findUnique({ where: { id: childId } });
+    let weeklyBudgetLimit, mlDailyBudget;
 
-    let weeklyBudgetLimit;
-    let mlDailyBudget;
-
-    // Kalkulasi Budget
     if (custom_budget !== undefined && custom_budget !== null) {
       weeklyBudgetLimit = parseFloat(custom_budget);
-      mlDailyBudget = weeklyBudgetLimit / 7; // Konversi ke harian untuk ML
+      mlDailyBudget = weeklyBudgetLimit / 7;
     } else {
       mlDailyBudget = parseFloat(childBase.optimal_budget_cache) / 30;
       weeklyBudgetLimit = mlDailyBudget * 7;
     }
 
-    const { child, approvedRecipes } = await getScoredRecipesFromML(childId, mlDailyBudget);
-
-    // ALGORITMA KOMBINASI MENU
-    // 1. Cek Kelayakan Budget Minimum
-    const cheapestRecipe = [...approvedRecipes].sort((a, b) => parseFloat(a.est_price) - parseFloat(b.est_price))[0];
+    const { child, approvedRecipes } = await getScoredRecipesFromML(
+      childId,
+      mlDailyBudget,
+    );
+    const cheapestRecipe = [...approvedRecipes].sort(
+      (a, b) => parseFloat(a.est_price) - parseFloat(b.est_price),
+    )[0];
     const minPossibleCost = parseFloat(cheapestRecipe.est_price) * 21;
 
-    if (weeklyBudgetLimit < minPossibleCost) {
-      return res.status(400).json({ 
-        message: `Maaf, budget Rp ${weeklyBudgetLimit} terlalu rendah. Minimal budget yang dibutuhkan untuk 21 porsi dengan resep termurah kami adalah Rp ${minPossibleCost}.` 
-      });
-    }
+    if (weeklyBudgetLimit < minPossibleCost)
+      return res
+        .status(400)
+        .json({
+          message: `Maaf, budget terlalu rendah. Minimal budget untuk 21 porsi resep termurah adalah Rp ${minPossibleCost}.`,
+        });
 
-   // 2. Penyusunan Kombinasi Greedy + Rotasi Variasi Menu
     let actualTotalCost = 0;
     const mealPlanItems = [];
     const mealTimes = ["pagi", "siang", "malam"];
-    const TOTAL_MEALS = 21;
 
-    for (let i = 0; i < TOTAL_MEALS; i++) {
-      const remainingMeals = TOTAL_MEALS - 1 - i;
-      const minCostForRemaining = remainingMeals * parseFloat(cheapestRecipe.est_price);
-      
-      // Berapa sisa uang yang boleh dipakai untuk 1 porsi ini?
-      const maxAllowablePriceForThisMeal = weeklyBudgetLimit - actualTotalCost - minCostForRemaining;
+    for (let i = 0; i < 21; i++) {
+      const remainingMeals = 20 - i;
+      const minCostForRemaining =
+        remainingMeals * parseFloat(cheapestRecipe.est_price);
+      const maxAllowablePriceForThisMeal =
+        weeklyBudgetLimit - actualTotalCost - minCostForRemaining;
 
-      // Saring SEMUA resep yang harganya masih masuk dengan sisa uang saat ini
-      const affordableRecipes = approvedRecipes.filter(r => parseFloat(r.est_price) <= maxAllowablePriceForThisMeal);
-
-      let selectedRecipe = cheapestRecipe; // Fallback
-
-      if (affordableRecipes.length > 0) {
-        // FITUR ROTASI: Kita gunakan modulo (i % panjang_array) agar resep berganti-ganti.
-        // Karena array sudah urut dari skor tertinggi, ia akan merotasi misalnya 10 menu 
-        // terbaik teratas secara bergantian, tidak hanya memanggil index ke-0 terus menerus.
-        selectedRecipe = affordableRecipes[i % affordableRecipes.length];
-      }
+      const affordableRecipes = approvedRecipes.filter(
+        (r) => parseFloat(r.est_price) <= maxAllowablePriceForThisMeal,
+      );
+      let selectedRecipe =
+        affordableRecipes.length > 0
+          ? affordableRecipes[i % affordableRecipes.length]
+          : cheapestRecipe;
 
       actualTotalCost += parseFloat(selectedRecipe.est_price);
-
       mealPlanItems.push({
         recipe_id: selectedRecipe.id,
         day_number: Math.floor(i / 3) + 1,
         meal_time: mealTimes[i % 3],
         match_score: selectedRecipe.match_score,
-        estimated_cost: selectedRecipe.est_price
+        estimated_cost: selectedRecipe.est_price,
       });
     }
 
-    // Hapus jadwal lama & Simpan jadwal baru
     await prisma.mealPlan.deleteMany({
-      where: { child_id: child.id, plan_type: "mingguan" }
+      where: { child_id: child.id, plan_type: "mingguan" },
     });
 
     const savedPlan = await prisma.mealPlan.create({
@@ -235,27 +216,228 @@ const generateWeeklyPlan = async (req, res) => {
         plan_type: "mingguan",
         max_budget_limit: weeklyBudgetLimit,
         actual_total_cost: actualTotalCost,
-        items: { create: mealPlanItems }
+        items: { create: mealPlanItems },
       },
-      include: { 
-        items: { 
-          orderBy: [{ day_number: 'asc' }, { meal_time: 'asc' }],
-          include: { recipe: true } 
-        } 
+      include: {
+        items: {
+          orderBy: [{ day_number: "asc" }, { meal_time: "asc" }],
+          include: { recipe: true },
+        },
+      },
+    });
+
+    res
+      .status(201)
+      .json({
+        message: "Jadwal MPASI Mingguan berhasil disusun!",
+        data: savedPlan,
+      });
+  } catch (error) {
+    res
+      .status(500)
+      .json({
+        message: "Gagal men-generate jadwal mingguan",
+        error: error.message,
+      });
+  }
+};
+
+const searchMenuByIngredient = async (req, res) => {
+  try {
+    const { childId } = req.params;
+    const { custom_budget, ingredients } = req.body; 
+    // ingredients = array nama bahan untuk pencarian, misal: ["Ayam", "Wortel"]
+
+    const childBase = await prisma.child.findUnique({ 
+      where: { id: childId },
+      include: {
+        meal_plans: { where: { plan_type: "Bulanan" }, orderBy: { id: "desc" }, take: 1 }
       }
     });
+    
+    if (!childBase) return res.status(404).json({ message: "Data anak tidak ditemukan." });
 
-    res.status(201).json({
-      message: "Jadwal MPASI Mingguan berhasil disusun sesuai kombinasi budget!",
-      data: savedPlan
+    // 1. Ambil Budget Per Porsi (Jika tidak di-custom, ambil dari aktual bulanan / 90)
+    let budgetPerMenu;
+    if (custom_budget !== undefined && custom_budget !== null) {
+      budgetPerMenu = parseFloat(custom_budget);
+    } else {
+      const activeBulanan = childBase.meal_plans[0];
+      const rawBudget = activeBulanan?.actual_total_cost 
+        ? parseFloat(activeBulanan.actual_total_cost) / 90 
+        : parseFloat(childBase.optimal_budget_cache) / 30 / 3;
+      
+      // Pembulatan ke ratusan terdekat (misal 8333 -> 8300)
+      budgetPerMenu = Math.round(rawBudget / 100) * 100;
+    }
+    
+    // 2. Tarik Rekomendasi ML (Model AI akan memproses Alergi & Kesukaan dari DB otomatis)
+    const mlDailyBudget = budgetPerMenu * 3;
+    const { approvedRecipes } = await getScoredRecipesFromML(childId, mlDailyBudget);
+
+    // 3. Filter berdasarkan harga maksimal per porsi
+    let filteredRecipes = approvedRecipes.filter(r => parseFloat(r.est_price) <= budgetPerMenu);
+
+    // 4. LOGIKA OR: Filter murni berdasarkan bahan masakan yang dicari
+    if (ingredients && Array.isArray(ingredients) && ingredients.length > 0) {
+      const keywords = ingredients.map(i => i.toLowerCase());
+      filteredRecipes = filteredRecipes.filter(r => {
+        const bahanLower = r.bahan_masakan.toLowerCase();
+        const nameLower = r.name.toLowerCase();
+        // Return true jika minimal ada 1 bahan yang cocok (Logika OR)
+        return keywords.some(keyword => bahanLower.includes(keyword) || nameLower.includes(keyword));
+      });
+    }
+
+    // 5. Simpan ke Cache agar tidak hilang saat direfresh
+    await prisma.child.update({
+      where: { id: childId },
+      data: { last_search_cache: filteredRecipes },
     });
 
+    res.status(200).json({
+      message: `Berhasil menemukan rekomendasi menu.`,
+      budget_per_menu_applied: budgetPerMenu,
+      data: filteredRecipes,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Gagal men-generate jadwal mingguan", error: error.message });
+    res.status(500).json({ message: "Gagal mencari menu", error: error.message });
+  }
+};
+
+const deleteWeeklyPlan = async (req, res) => {
+  try {
+    const { childId } = req.params;
+    await prisma.mealPlan.deleteMany({
+      where: { child_id: childId, plan_type: "mingguan" },
+    });
+    res.status(200).json({ message: "Perencanaan mingguan berhasil dihapus." });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Gagal menghapus jadwal", error: error.message });
+  }
+};
+
+const getAlternativeRecipes = async (req, res) => {
+  try {
+    const { childId, mealPlanItemId } = req.params;
+    const currentItem = await prisma.mealPlanItem.findUnique({
+      where: { id: mealPlanItemId },
+      include: { meal_plan: { include: { items: true } } },
+    });
+    if (!currentItem)
+      return res
+        .status(404)
+        .json({ message: "Menu tidak ditemukan di jadwal." });
+
+    const plan = currentItem.meal_plan;
+    const childBase = await prisma.child.findUnique({ where: { id: childId } });
+    const availableBudgetForThisMeal =
+      parseFloat(plan.max_budget_limit) -
+      parseFloat(plan.actual_total_cost) +
+      parseFloat(currentItem.estimated_cost);
+
+    const mlDailyBudget = parseFloat(childBase.optimal_budget_cache) / 30;
+    const { approvedRecipes } = await getScoredRecipesFromML(
+      childId,
+      mlDailyBudget,
+    );
+    const existingRecipeIds = plan.items.map((item) => item.recipe_id);
+
+    const alternativeCandidates = approvedRecipes.filter(
+      (r) =>
+        parseFloat(r.est_price) <= availableBudgetForThisMeal &&
+        !existingRecipeIds.includes(r.id),
+    );
+    res
+      .status(200)
+      .json({
+        message: "Berhasil mendapatkan alternatif menu",
+        available_budget: availableBudgetForThisMeal,
+        data: alternativeCandidates.slice(0, 5),
+      });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Gagal mencari alternatif", error: error.message });
+  }
+};
+
+const swapMealPlanItem = async (req, res) => {
+  try {
+    const { mealPlanItemId } = req.params;
+    const { new_recipe_id, new_estimated_cost, new_match_score } = req.body;
+    const currentItem = await prisma.mealPlanItem.findUnique({
+      where: { id: mealPlanItemId },
+      include: { meal_plan: true },
+    });
+    if (!currentItem)
+      return res.status(404).json({ message: "Menu tidak ditemukan." });
+
+    const plan = currentItem.meal_plan;
+    const newTotalCost =
+      parseFloat(plan.actual_total_cost) +
+      (parseFloat(new_estimated_cost) - parseFloat(currentItem.estimated_cost));
+    if (newTotalCost > parseFloat(plan.max_budget_limit))
+      return res
+        .status(400)
+        .json({ message: "Gagal mengganti. Budget melebihi batas." });
+
+    await prisma.$transaction([
+      prisma.mealPlanItem.update({
+        where: { id: mealPlanItemId },
+        data: {
+          recipe_id: new_recipe_id,
+          estimated_cost: parseFloat(new_estimated_cost),
+          match_score: parseFloat(new_match_score),
+        },
+      }),
+      prisma.mealPlan.update({
+        where: { id: plan.id },
+        data: { actual_total_cost: newTotalCost },
+      }),
+    ]);
+
+    const updatedPlan = await prisma.mealPlan.findUnique({
+      where: { id: plan.id },
+      include: {
+        items: {
+          orderBy: [{ day_number: "asc" }, { meal_time: "asc" }],
+          include: { recipe: true },
+        },
+      },
+    });
+    const formattedWeeklyPlan = [];
+    for (let day = 1; day <= 7; day++) {
+      const dayItems = updatedPlan.items.filter(
+        (item) => item.day_number === day,
+      );
+      const getRecipeByTime = (time) => {
+        const found = dayItems.find((i) => i.meal_time === time);
+        return found ? { ...found.recipe, mealPlanItemId: found.id } : null;
+      };
+      formattedWeeklyPlan.push({
+        pagi: getRecipeByTime("pagi"),
+        siang: getRecipeByTime("siang"),
+        malam: getRecipeByTime("malam"),
+      });
+    }
+    res
+      .status(200)
+      .json({ message: "Menu berhasil diganti!", data: formattedWeeklyPlan });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Gagal mengganti menu", error: error.message });
   }
 };
 
 module.exports = {
   generateSingleMenu,
-  generateWeeklyPlan
+  generateWeeklyPlan,
+  searchMenuByIngredient,
+  deleteWeeklyPlan,
+  getAlternativeRecipes,
+  swapMealPlanItem,
 };

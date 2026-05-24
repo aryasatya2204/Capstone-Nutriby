@@ -123,7 +123,8 @@ const calculateDynamicBudget = (zScoreWFH, gajiOrangTua) => {
 const calculateWaterlowCalories = (zScoreWFH, beratAktual, beratIdeal, akgKkalPerKg) => {
   if (zScoreWFH < -2.0) {
     // Fase Catch-up Growth
-    return (akgKkalPerKg * beratIdeal) / beratAktual;
+    const kkalPerKgHari = (akgKkalPerKg * beratIdeal) / beratAktual;
+    return kkalPerKgHari * beratAktual; 
   }
   // Fase Pemeliharaan (Normal)
   return akgKkalPerKg * beratIdeal;

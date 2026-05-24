@@ -49,10 +49,9 @@ const getDailyInsight = async (req, res) => {
       ? parseFloat(child.optimal_budget_cache)
       : 0;
 
-    const prompt = `
+   const prompt = `
       Bertindaklah sebagai Ahli Gizi Anak yang sangat empatik.
       Data Anak: Nama ${child.name}, Usia ${ageMonths} bulan, Status Gizi: ${statusGizi}.
-      Saran Anggaran Bulanan: Rp ${Math.round(budgetLimit).toLocaleString("id-ID")}.
 
       Tugas: Buat tepat 1 kalimat tips gizi harian yang relevan dengan kondisi anak dan usia MPASI-nya.
       Gunakan bahasa Indonesia yang santai dan hangat (sapaan Bunda/Ayah). Jangan gunakan emoji, simbol bintang (*), tanda pagar (#), atau format markdown apapun. Maksimal 2 kalimat.

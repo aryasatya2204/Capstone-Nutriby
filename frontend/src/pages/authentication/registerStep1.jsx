@@ -83,7 +83,7 @@ function RegisterStep1({ onClose, onShowLogin, onNext }) {
       } else {
         setError(data.message || "Registrasi gagal. Silakan coba lagi.");
       }
-    } catch (err) {
+    } catch {
       setError("Gagal terhubung ke server. Periksa koneksi Anda.");
     } finally {
       setIsLoading(false);
@@ -113,7 +113,7 @@ function RegisterStep1({ onClose, onShowLogin, onNext }) {
       } else {
         setError(data.message || "Google Register gagal.");
       }
-    } catch (err) {
+    } catch {
       setError("Gagal terhubung ke server auth Google.");
     } finally {
       setIsLoading(false);
