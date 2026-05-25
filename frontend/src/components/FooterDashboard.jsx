@@ -3,8 +3,10 @@ export default function FooterDashboard() {
     <footer className="mt-auto w-full bg-white py-6 text-center shadow-inner">
       <p className="text-sm font-medium text-gray-500">
         <a
-          href="mailto:nutribyadmin@gmail.com"
-          className="text-sm text-gary/80 hover:text-black transition-colors md:text-[12px]"
+          href="https://mail.google.com/mail/?view=cm&to=nutribyadmin@gmail.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm text-gray/80 hover:text-[#8B1E1E] transition-colors md:text-[12px]"
           aria-label="Email support"
         >
           ✉ nutribyadmin@gmail.com

@@ -45,7 +45,7 @@ export default function Features() {
       <main className="mx-auto flex w-full max-w-6xl flex-grow flex-col px-6 py-10">
         <div className="text-center mb-10">
           <h1 className="text-4xl font-extrabold text-[#8B2020] uppercase tracking-wide">
-            Layanan NutriBy
+            Yuk Jelajahi Nutriby!
           </h1>
           <p className="mt-3 text-gray-600 text-lg">
             Pilih fitur di bawah ini untuk membantu perjalanan gizi si Kecil.
@@ -74,7 +74,7 @@ export default function Features() {
                   {feature.desc}
                 </p>
                 <span className="mt-3 inline-block font-bold text-[#8B2020] text-sm group-hover:underline underline-offset-4">
-                  Lihat Fitur →
+                  Mulai Sekarang →
                 </span>
               </div>
             </Link>

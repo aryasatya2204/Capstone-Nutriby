@@ -80,7 +80,7 @@ export default function ChildRegistration({ onClose, forcedError }) {
     };
   }, []);
 
-  // Format String (Hilangkan "_" dan jadikan Kapital di Awal Kata)
+  // rubah format string
   const formatLabel = (str) => {
     if (!str) return "";
     return str
@@ -105,18 +105,16 @@ export default function ChildRegistration({ onClose, forcedError }) {
     let val = e.target.value;
     val = val.replace(",", "."); // Ubah koma jadi titik agar seragam
 
-    // Regex: Hanya angka, boleh ada 1 titik, maksimal 1 angka setelah titik
+   
     if (val === "" || /^\d*\.?\d{0,1}$/.test(val)) {
       setFormData({ ...formData, [e.target.name]: val });
       setError("");
     }
   };
 
-  // Handler Khusus Gaji (Format Titik Ribuan)
+
   const handleSalaryChange = (e) => {
-    // Hapus semua karakter selain angka
     const rawValue = e.target.value.replace(/\D/g, "");
-    // Format: tambahkan titik setiap 3 angka
     const formattedValue = rawValue.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 
     setFormData({ ...formData, parent_salary: formattedValue });

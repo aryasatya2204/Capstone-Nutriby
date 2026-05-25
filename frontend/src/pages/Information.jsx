@@ -10,7 +10,6 @@ function ArticleCard({ article }) {
       rel="noopener noreferrer"
       className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition group"
     >
-      {/* Gambar — rasio 4:3 */}
       <div className="w-full aspect-[4/3] overflow-hidden">
         <img
           src={article.image}
@@ -20,22 +19,15 @@ function ArticleCard({ article }) {
       </div>
 
       <div className="p-3">
-        {/* Tag kategori */}
         <span className="text-[9px] font-bold text-[#8B1E1E] uppercase tracking-wider">
           {article.tag}
         </span>
-
-        {/* Judul */}
         <h3 className="text-[13px] font-bold text-gray-800 leading-snug mt-0.5 mb-1 line-clamp-2">
           {article.title}
         </h3>
-
-        {/* Excerpt */}
         <p className="text-[11px] text-gray-500 leading-relaxed line-clamp-2 mb-3">
           {article.excerpt}
         </p>
-
-        {/* Baris bawah: waktu baca + panah */}
         <div className="flex items-center justify-between">
           <span className="text-[10px] text-gray-400 italic">
             Hanya {article.readTime}
@@ -57,19 +49,16 @@ export default function Information() {
       <NavbarDashboard />
 
       <main className="flex-grow w-full max-w-2xl mx-auto px-4 py-6">
-        {/* ── JUDUL SECTION ── */}
         <div className="mb-5 text-center">
           <h1 className="text-[38px] font-extrabold text-[#8B1E1E] uppercase tracking-wide">
-            Baca Yuk!
+            Info & Tips Si Kecil
           </h1>
           <p className="text-[13px] text-gray-500 mt-1">
             Temukan panduan nutrisi terbaik untuk tumbuh kembang si kecil
           </p>
         </div>
 
-        {/* ── BARIS ATAS: Artikel Unggulan + Quote Harian ── */}
         <div className="flex gap-4 mb-8">
-          {/* Artikel Unggulan */}
           <a
             href={featuredArticle.url}
             target="_blank"
@@ -96,7 +85,6 @@ export default function Information() {
             </div>
           </a>
 
-          {/* Quote Harian */}
           <a
             href={dailyQuote.url}
             target="_blank"
@@ -117,9 +105,8 @@ export default function Information() {
           </a>
         </div>
 
-        {/* ── ARTIKEL TERBARU ── */}
         <div>
-          <h2 className="text-[15px] font-bold text-gray-800 mb-4">
+          <h2 id="artikel" className="text-[15px] font-bold text-gray-800 mb-4">
             Artikel Terbaru
           </h2>
 

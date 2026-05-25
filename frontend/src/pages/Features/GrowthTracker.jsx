@@ -3,13 +3,13 @@ import GrowthPDFTemplate from "./GrowthPDFTemplate";
 import { generatePDF } from "../../helpers/pdfHelper";
 import NavbarDashboard from "../../components/NavbarDashboard";
 import FooterDashboard from "../../components/FooterDashboard";
+import { useAuth } from "../../context/authContext";
 
-// ─── KONSTANTA ────────────────────────────────────────────────────────────────
 const API_BASE = "http://localhost:3000/api";
-const COOLDOWN_DAYS = 7; // Durasi cooldown dalam hari
-const COOLDOWN_MS = COOLDOWN_DAYS * 24 * 60 * 60 * 1000; // Konversi ke milidetik
+const COOLDOWN_DAYS = 7;
+const COOLDOWN_MS = COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
 
-// ─── HELPER: FORMAT TANGGAL INDONESIA ────────────────────────────────────────
+// format ke tanggal indonesia
 const formatTanggal = (isoString) => {
   if (!isoString) return "-";
   return new Date(isoString).toLocaleDateString("id-ID", {
@@ -19,7 +19,7 @@ const formatTanggal = (isoString) => {
   });
 };
 
-// ─── HELPER: FORMAT JAM:MENIT COUNTDOWN ──────────────────────────────────────
+// hitung sisa waktu countdown
 const formatCountdown = (ms) => {
   if (ms <= 0) return "0 hari";
   const hari = Math.floor(ms / (1000 * 60 * 60 * 24));
@@ -29,7 +29,7 @@ const formatCountdown = (ms) => {
   return `${jam} jam ${menit} menit`;
 };
 
-// ─── HELPER: WARNA STATUS GIZI ────────────────────────────────────────────────
+// styling warna sesuai status gizi
 const getStatusStyle = (status) => {
   const s = (status || "").toLowerCase();
   if (s.includes("baik") || s.includes("normal"))
@@ -46,7 +46,6 @@ const getStatusStyle = (status) => {
 };
 
 function GrowthChart({ data, whoTarget, unit, color = "#8B2020" }) {
-  // Guard: jika data kosong tampilkan placeholder
   if (!data || data.length === 0) {
     return (
       <div className="h-48 flex flex-col items-center justify-center text-center">
@@ -61,24 +60,23 @@ function GrowthChart({ data, whoTarget, unit, color = "#8B2020" }) {
     );
   }
 
-  // ── KALKULASI TITIK SVG ───────────────────────────────────────────────────
-  const W = 500; // Lebar SVG viewBox
-  const H = 180; // Tinggi SVG viewBox
-  const PAD = { top: 20, right: 20, bottom: 40, left: 40 }; // Padding dalam
+  // konfigurasi dimensi svg grafik
+  const W = 500;
+  const H = 180;
+  const PAD = { top: 20, right: 20, bottom: 40, left: 40 };
 
-  // Range nilai Y (nilai aktual anak)
   const values = data.map((d) => d.value).filter(Boolean);
   const minVal = Math.max(0, Math.min(...values) - (unit === "kg" ? 1 : 3));
   const maxVal = Math.max(...values) + (unit === "kg" ? 1 : 3);
 
-  // Fungsi konversi nilai → koordinat SVG
+  // fungsi konversi nilai ke koordinat x dan y
   const toX = (idx) =>
     PAD.left +
     (idx / Math.max(data.length - 1, 1)) * (W - PAD.left - PAD.right);
   const toY = (val) =>
     PAD.top + ((maxVal - val) / (maxVal - minVal)) * (H - PAD.top - PAD.bottom);
 
-  // Buat path string untuk garis aktual
+  // generate path garis grafik
   const pathActual = data
     .filter((d) => d.value)
     .map(
@@ -87,12 +85,10 @@ function GrowthChart({ data, whoTarget, unit, color = "#8B2020" }) {
     )
     .join(" ");
 
-  // Buat path area (fill bawah garis)
   const firstIdx = 0;
   const lastIdx = data.length - 1;
   const areaPath = `${pathActual} L ${toX(lastIdx)} ${H - PAD.bottom} L ${toX(firstIdx)} ${H - PAD.bottom} Z`;
 
-  // Buat path garis WHO target (horizontal)
   const whoY = whoTarget ? toY(whoTarget) : null;
 
   return (
@@ -102,7 +98,6 @@ function GrowthChart({ data, whoTarget, unit, color = "#8B2020" }) {
         className="w-full min-w-[280px]"
         style={{ height: "auto" }}
       >
-        {/* Defs: gradient area di bawah garis */}
         <defs>
           <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity="0.15" />
@@ -110,7 +105,6 @@ function GrowthChart({ data, whoTarget, unit, color = "#8B2020" }) {
           </linearGradient>
         </defs>
 
-        {/* Grid horizontal — 4 garis bantu */}
         {[0.25, 0.5, 0.75].map((ratio, i) => {
           const y = PAD.top + ratio * (H - PAD.top - PAD.bottom);
           return (
@@ -126,7 +120,6 @@ function GrowthChart({ data, whoTarget, unit, color = "#8B2020" }) {
           );
         })}
 
-        {/* Garis WHO Target (jika ada) */}
         {whoY && (
           <>
             <line
@@ -151,10 +144,8 @@ function GrowthChart({ data, whoTarget, unit, color = "#8B2020" }) {
           </>
         )}
 
-        {/* Area fill di bawah garis aktual */}
         <path d={areaPath} fill="url(#areaGrad)" />
 
-        {/* Garis aktual */}
         <path
           d={pathActual}
           fill="none"
@@ -162,21 +153,17 @@ function GrowthChart({ data, whoTarget, unit, color = "#8B2020" }) {
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
-        />
+          />
 
-        {/* Titik data */}
         {data.map((d, i) => {
           if (!d.value) return null;
           const cx = toX(i);
           const cy = toY(d.value);
           return (
             <g key={i}>
-              {/* Lingkaran luar (hover area) */}
               <circle cx={cx} cy={cy} r="6" fill="white" />
-              {/* Lingkaran dalam berwarna */}
               <circle cx={cx} cy={cy} r="4" fill={color} />
 
-              {/* Label nilai di atas titik */}
               <text
                 x={cx}
                 y={cy - 10}
@@ -192,16 +179,13 @@ function GrowthChart({ data, whoTarget, unit, color = "#8B2020" }) {
           );
         })}
 
-        {/* Label sumbu X (nama bulan/tanggal) */}
         {data.map((d, i) => {
           const cx = toX(i);
-          // Tampilkan label hanya jika tidak terlalu berdekatan
           const show =
             data.length <= 6 ||
             i % Math.ceil(data.length / 6) === 0 ||
             i === data.length - 1;
           if (!show) return null;
-          // Format singkat: "Bln X" atau tanggal
           const label = d.date_label
             ? `Bln ${new Date(d.date_label + "T00:00:00").getMonth() + 1}`
             : `Data ${i + 1}`;
@@ -219,7 +203,6 @@ function GrowthChart({ data, whoTarget, unit, color = "#8B2020" }) {
           );
         })}
 
-        {/* Label sumbu Y (nilai) */}
         <text
           x={PAD.left - 6}
           y={PAD.top + 4}
@@ -243,7 +226,6 @@ function GrowthChart({ data, whoTarget, unit, color = "#8B2020" }) {
   );
 }
 
-// ─── KOMPONEN: STAT CARD ──────────────────────────────────────────────────────
 function StatCard({ label, value, unit, delta, icon }) {
   const isPositive = delta > 0;
   return (
@@ -273,9 +255,8 @@ function StatCard({ label, value, unit, delta, icon }) {
   );
 }
 
-// ─── KOMPONEN UTAMA: GrowthTracker ───────────────────────────────────────────
 export default function GrowthTracker() {
-  // === STATE DATA ===
+  const { activeChild, fetchChildren } = useAuth();
   const [childData, setChildData] = useState(null);
   const [chartData, setChartData] = useState({
     weight_chart: [],
@@ -292,39 +273,42 @@ export default function GrowthTracker() {
     new Date().toISOString().split("T")[0],
   );
 
-  // === STATE TAMPILAN ===
-  const [activeChart, setActiveChart] = useState("berat"); // "berat" atau "tinggi"
-  const [cooldownRemaining, setCooldownRemaining] = useState(0); // Sisa cooldown dalam ms\
+  const [activeChart, setActiveChart] = useState("berat");
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
 
+  // validasi cooldown log terakhir anak
   const checkCooldown = useCallback((child) => {
     if (!child) return;
-    // Ambil tanggal log terakhir dari data backend (growth_logs)
     const lastLog = child.growth_logs?.[0];
-    if (!lastLog?.record_date) { setCooldownRemaining(0); return; }
+    if (!lastLog?.record_date) {
+      setCooldownRemaining(0);
+      return;
+    }
 
-    const lastTime = new Date(lastLog.record_date).getTime();
+    const rawDate = lastLog.record_date;
+    const normalizedDate = rawDate.includes("T") ? rawDate : `${rawDate}T00:00:00`;
+    const lastTime = new Date(normalizedDate).getTime();
     const remaining = COOLDOWN_MS - (Date.now() - lastTime);
     setCooldownRemaining(remaining > 0 ? remaining : 0);
   }, []);
 
-  // Update countdown setiap menit berdasarkan data backend
+  // update sisa waktu cooldown per menit
   useEffect(() => {
     if (!childData) return;
-    
-    // Gunakan setTimeout agar tidak melakukan state update secara sinkron di dalam effect body
+
     const timeoutId = setTimeout(() => {
       checkCooldown(childData);
     }, 0);
-    
+
     const interval = setInterval(() => checkCooldown(childData), 60000);
-    
+
     return () => {
       clearTimeout(timeoutId);
       clearInterval(interval);
     };
   }, [childData, checkCooldown]);
 
-  // ─── FETCH DATA AWAL ─────────────────────────────────────────────────────
+  // ambil data anak dan grafik dari api
   useEffect(() => {
     const fetchAll = async () => {
       setIsLoadingData(true);
@@ -332,9 +316,7 @@ export default function GrowthTracker() {
         const token = localStorage.getItem("token");
         const headers = { Authorization: `Bearer ${token}` };
 
-        const childRes = await fetch(`${API_BASE}/children`, { headers });
-        const childJson = await childRes.json();
-        const child = childJson?.[0];
+        const child = activeChild;
         if (!child) return;
         setChildData(child);
 
@@ -346,7 +328,6 @@ export default function GrowthTracker() {
           setChartData(chartJson.data);
         }
 
-        // Cek cooldown dari data backend (growth_logs dari /children)
         checkCooldown(child);
       } catch (err) {
         console.error("Gagal fetch data growth tracker:", err);
@@ -358,7 +339,7 @@ export default function GrowthTracker() {
     fetchAll();
   }, [checkCooldown]);
 
-  // ─── HANDLER: SIMPAN DATA PERTUMBUHAN ───────────────────────────────────
+  // simpan input log pertumbuhan baru
   const handleSave = async () => {
     if (!childData?.id || cooldownRemaining > 0) return;
     if (!beratInput || !tinggiInput) {
@@ -382,7 +363,6 @@ export default function GrowthTracker() {
         body: JSON.stringify({
           weight: parseFloat(beratInput),
           height: parseFloat(tinggiInput),
-
           date: tanggalInput,
         }),
       });
@@ -390,24 +370,19 @@ export default function GrowthTracker() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Gagal menyimpan data.");
 
-      // Refresh data anak dari backend agar cooldown dihitung dari server
-      const childRes = await fetch(`${API_BASE}/children`, { headers: { Authorization: `Bearer ${token}` } });
-      const childJson = await childRes.json();
-      const updatedChild = childJson?.[0];
+      await fetchChildren();
+      const updatedChild = activeChild;
       if (updatedChild) {
         setChildData(updatedChild);
-        checkCooldown(updatedChild); // cooldown dari backend, bukan localStorage
+        checkCooldown(updatedChild);
       } else {
-        setCooldownRemaining(COOLDOWN_MS); // fallback jika re-fetch gagal
+        setCooldownRemaining(COOLDOWN_MS);
       }
 
       setSaveSuccess(true);
-
-      // Reset form input
       setBeratInput("");
       setTinggiInput("");
 
-      // Refresh data grafik agar titik baru muncul
       const headers = { Authorization: `Bearer ${token}` };
       const chartRes = await fetch(`${API_BASE}/growth/${childData.id}/chart`, {
         headers,
@@ -415,7 +390,6 @@ export default function GrowthTracker() {
       const chartJson = await chartRes.json();
       if (chartJson?.data) setChartData(chartJson.data);
 
-      // Sembunyikan notifikasi sukses setelah 4 detik
       setTimeout(() => setSaveSuccess(false), 4000);
     } catch (err) {
       console.error("Error simpan log pertumbuhan:", err);
@@ -425,7 +399,7 @@ export default function GrowthTracker() {
     }
   };
 
-  // ─── DATA TERAKHIR (untuk StatCard) ─────────────────────────────────────
+  // kalkulasi perbandingan nilai bulan ini dan lalu
   const lastWeight = chartData.weight_chart.slice(-1)[0];
   const prevWeight = chartData.weight_chart.slice(-2)[0];
   const lastHeight = chartData.height_chart.slice(-1)[0];
@@ -440,17 +414,14 @@ export default function GrowthTracker() {
       ? (parseFloat(lastHeight.value) - parseFloat(prevHeight.value)).toFixed(1)
       : null;
 
-  // Status terbaru dari log terakhir
   const latestStatus = lastWeight?.status || "-";
   const statusStyle = getStatusStyle(latestStatus);
 
-  // ─── RENDER ──────────────────────────────────────────────────────────────
   return (
     <div className="flex min-h-screen flex-col bg-[#F3EFEA] font-['Lato']">
       <NavbarDashboard />
 
       <main className="flex-1 px-4 py-6 md:px-6 lg:px-10 max-w-7xl mx-auto w-full">
-        {/* ── HEADER HALAMAN ──────────────────────────────────────── */}
         <div className="mb-6">
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
             <a
@@ -472,11 +443,8 @@ export default function GrowthTracker() {
           </p>
         </div>
 
-        {/* ── LAYOUT: 2 KOLOM ────────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* ═══ KOLOM KIRI: STATUS + FORM INPUT ═══════════════════ */}
           <div className="lg:col-span-2 space-y-4">
-            {/* Card: Status Saat Ini */}
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xs font-black uppercase tracking-widest text-gray-400">
@@ -493,7 +461,6 @@ export default function GrowthTracker() {
               </div>
 
               {isLoadingData ? (
-                // Skeleton loader
                 <div className="space-y-3 animate-pulse">
                   <div className="h-12 bg-gray-100 rounded-xl w-32" />
                   <div className="h-4 bg-gray-100 rounded-lg w-full" />
@@ -501,7 +468,6 @@ export default function GrowthTracker() {
                 </div>
               ) : lastWeight ? (
                 <>
-                  {/* Berat terakhir (tampil besar seperti desain referensi) */}
                   <div className="mb-4">
                     <p className="text-4xl font-black text-gray-900">
                       {parseFloat(lastWeight.value).toFixed(1)}
@@ -519,12 +485,10 @@ export default function GrowthTracker() {
                     )}
                   </div>
 
-                  {/* Progress bar visual status */}
                   <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden mb-2">
                     <div
                       className={`h-full rounded-full transition-all duration-700 ${statusStyle.dot}`}
                       style={{
-                        // Panjang bar berdasarkan z-score (0 = 0%, normal +0 = 50%, +2 = 100%)
                         width: `${Math.min(100, Math.max(10, ((parseFloat(lastWeight.zscore || 0) + 3) / 6) * 100))}%`,
                       }}
                     />
@@ -549,7 +513,6 @@ export default function GrowthTracker() {
               )}
             </div>
 
-            {/* Card: Input Data Baru */}
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5">
               <h2 className="text-base font-black text-[#8B2020] mb-4 flex items-center gap-2">
                 <span className="w-7 h-7 bg-[#8B2020]/10 rounded-lg flex items-center justify-center text-sm">
@@ -559,7 +522,6 @@ export default function GrowthTracker() {
               </h2>
 
               <div className="space-y-3">
-                {/* Input Berat Badan */}
                 <div>
                   <label className="text-xs font-bold text-gray-600 mb-1.5 block">
                     Berat Badan (kg)
@@ -580,7 +542,6 @@ export default function GrowthTracker() {
                   />
                 </div>
 
-                {/* Input Tinggi Badan */}
                 <div>
                   <label className="text-xs font-bold text-gray-600 mb-1.5 block">
                     Tinggi Badan (cm)
@@ -601,7 +562,6 @@ export default function GrowthTracker() {
                   />
                 </div>
 
-                {/* Input Tanggal Pengukuran */}
                 <div>
                   <label className="text-xs font-bold text-gray-600 mb-1.5 block">
                     Tanggal Pengukuran
@@ -619,7 +579,6 @@ export default function GrowthTracker() {
                 </div>
               </div>
 
-              {/* Notifikasi Error */}
               {errorMsg && (
                 <div className="mt-3 bg-red-50 border border-red-100 rounded-xl p-3">
                   <p className="text-xs text-red-600 font-bold">
@@ -639,7 +598,6 @@ export default function GrowthTracker() {
                 </div>
               )}
 
-              {/* Tombol Simpan Data — dengan logika cooldown */}
               <button
                 onClick={handleSave}
                 disabled={
@@ -682,7 +640,6 @@ export default function GrowthTracker() {
                     Menyimpan...
                   </>
                 ) : cooldownRemaining > 0 ? (
-                  /* Tombol cooldown: abu-abu dengan countdown */
                   <>
                     <svg
                       className="w-4 h-4"
@@ -704,7 +661,6 @@ export default function GrowthTracker() {
                 )}
               </button>
 
-              {/* Info aturan cooldown 7 hari */}
               <p className="text-xs text-gray-400 text-center mt-2">
                 {cooldownRemaining > 0
                   ? `Input berikutnya tersedia setelah 7 hari dari pengisian terakhir`
@@ -713,7 +669,6 @@ export default function GrowthTracker() {
             </div>
           </div>
 
-          {/* ═══ KOLOM KANAN: GRAFIK & STATISTIK ═══════════════════ */}
           <div className="lg:col-span-3 space-y-4">
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5">
               <div className="flex items-center justify-between mb-4">
@@ -747,7 +702,6 @@ export default function GrowthTracker() {
                 </div>
               </div>
 
-              {/* Grafik SVG */}
               {isLoadingData ? (
                 <div className="h-48 bg-gray-50 rounded-2xl animate-pulse flex items-center justify-center">
                   <p className="text-xs text-gray-300">Memuat grafik...</p>
@@ -761,13 +715,7 @@ export default function GrowthTracker() {
                   }
                   unit={activeChart === "berat" ? "kg" : "cm"}
                   color="#8B2020"
-                  whoTarget={
-                    activeChart === "berat"
-                      ? chartData.weight_chart.length > 0
-                        ? null
-                        : null
-                      : null
-                  }
+                  whoTarget={null}
                 />
               )}
 
@@ -839,16 +787,20 @@ export default function GrowthTracker() {
                   </h3>
                   <p className="text-sm text-white/80 leading-relaxed mb-4">
                     {chartData.weight_chart.length > 1
-                      ? `Pertumbuhan ${chartData.weight_chart.length} bulan terakhir menunjukkan dedikasi luar biasa dalam memberikan nutrisi terbaik. Terus berikan kasih sayang lewat setiap suapan MPASI yang bergizi.`
-                      : "Data pertumbuhan pertama sudah tercatat! Pantau terus setiap 7 hari untuk melihat perkembangan si kecil."}
+                      ? `Pertumbuhan ${chartData.weight_chart.length} bulan terakhir menunjukkan dedikasi luar biasa dalam memberikan nutrisi terbaik.`
+                      : "Awal yang baik! Terus pantau tumbuh kembang si kecil secara berkala."}
                   </p>
-
                   <button
-  onClick={() => generatePDF("pdf-report-container", `Laporan_Pertumbuhan_${childData?.name || 'Anak'}`)}
-  className="flex items-center gap-2 bg-white/15 hover:bg-white/25
+                    onClick={() =>
+                      generatePDF(
+                        "pdf-report-container",
+                        `Laporan_Pertumbuhan_${childData?.name || "Anak"}`,
+                      )
+                    }
+                    className="flex items-center gap-2 bg-white/15 hover:bg-white/25
   text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all duration-200
   border border-white/20 hover:border-white/40"
->
+                  >
                     <svg
                       className="w-3.5 h-3.5"
                       fill="none"
@@ -869,11 +821,11 @@ export default function GrowthTracker() {
             )}
           </div>
         </div>
-        <GrowthPDFTemplate 
-         childData={childData} 
-         chartData={chartData} 
-         latestStatus={latestStatus} 
-      />
+        <GrowthPDFTemplate
+          childData={childData}
+          chartData={chartData}
+          latestStatus={latestStatus}
+        />
       </main>
 
       <FooterDashboard />

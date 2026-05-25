@@ -67,7 +67,7 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
           data.message || "Gagal login, periksa kembali email/password Anda.",
         );
       }
-    } catch {
+    } catch (err) {
       setError("Gagal terhubung ke server.");
     } finally {
       setIsLoading(false);
@@ -86,7 +86,6 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
         login(data.user);
-
         setShowSuccess(true);
         setTimeout(() => {
           onClose();
@@ -95,7 +94,7 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
       } else {
         setError(data.message || "Login Google gagal.");
       }
-    } catch {
+    } catch (err) {
       setError("Server Error.");
     }
   };
@@ -114,7 +113,9 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
           <p className="mt-2 text-lg font-medium text-[#8B2020]">
             Selamat datang di NutriBy.
           </p>
-          <p className="mt-1 text-sm text-gray-400">Mengalihkan ke dashboard...</p>
+          <p className="mt-1 text-sm text-gray-400">
+            Mengalihkan ke dashboard...
+          </p>
         </div>
       </div>
     );
@@ -183,11 +184,16 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
         <button
           onClick={handleManualLogin}
           disabled={isLoading || !isFormValid}
-          title={!isFormValid ? "Lengkapi email @gmail.com dan password terlebih dahulu" : ""}
+          title={
+            !isFormValid
+              ? "Lengkapi email @gmail.com dan password terlebih dahulu"
+              : ""
+          }
           className={`mt-10 w-full rounded-full py-3.5 text-[18px] font-bold transition-all
-            ${isFormValid && !isLoading
-              ? "bg-white text-[#8B2020] hover:bg-gray-100 cursor-pointer"
-              : "bg-white/40 text-white/60 cursor-not-allowed"
+            ${
+              isFormValid && !isLoading
+                ? "bg-white text-[#8B2020] hover:bg-gray-100 cursor-pointer"
+                : "bg-white/40 text-white/60 cursor-not-allowed"
             }`}
         >
           {isLoading ? "Memproses..." : "Masuk"}

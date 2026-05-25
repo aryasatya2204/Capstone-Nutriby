@@ -6,14 +6,14 @@
     "title": "Manfaat Alpukat Bagi Kelancaran ASI",
     "excerpt": "Pelajari mengapa alpukat berperan penting dalam kelancaran ASI. Selain itu pelajari mengapa ASI menjadi sumber nutrisi paling penting dalam 6 bulan pertama bayi.",
     "readTime": "5 menit baca",
-    "url": "https://www.alodokter.com/manfaat-alpukat-untuk-ibu-menyusui"
+    "url": "https://www.halodoc.com/artikel/manfaat-alpukat-untuk-ibu-menyusui-asi-berlimpah-ibu-sehat?srsltid=AfmBOoo337O7RShIzkOFm9sqfE_SMC55bv7N2OaI09k8ZeJINGTJjxv-"
   },
 
   "dailyQuote": {
     "label": "Kata-kata hari ini",
     "text": "Sabar adalah kunci saat mengenalkan rasa baru ke buah hati.",
     "cta": "Tips lainnya >>",
-    "url": "#"
+    "url": ""
   },
 
   "latestArticles": [
@@ -55,12 +55,39 @@
     },
     {
       "id": 6,
-      "image": "https://images.unsplash.com/photo-1624727828489-a1e03b79bba8?w=400&q=80",
+      "image": "https://www.generasimaju.co.id/articles/article/image-thumb__608882__webp/gizi-balita-1-hingga-5-tahun-SGM%20%281%29.webp",
       "tag": "NUTRISI",
-      "title": "Panduan Memenuhi Kebutuhan Gizi Bayi (Usia 0-12 Bulan)",
-      "excerpt": "Pemberian nutrisi di awal masa kehidupan penting bagi pertumbuhan si Kecil. Bagaimana aturan memenuhi kebutuhan gizi bayi setiap harinya?",
+      "title": "Daftar Kebutuhan Gizi Balita Usia 1-5 Tahun yang Wajib Dipenuhi",
+      "excerpt": "Pemberian nutrisi di awal masa kehidupan penting bagi pertumbuhan si Kecil. Kebutuhan gizi anak usia 1–5 tahun harus seimbang untuk mendukung pertumbuhan yang optimal.",
       "readTime": "6 menit baca",
-      "url": "https://hellosehat.com/parenting/bayi/gizi-bayi/kebutuhan-gizi-bayi/"
+      "url": "https://www.generasimaju.co.id/artikel/1-tahun/nutrisi/gizi-balita-1-hingga-5-tahun"
+    },
+    {
+      "id": 7,
+      "image": "https://images.alodokter.com/dk0z4ums3/image/upload/v1633431359/attached_image/pilihan-makanan-sehat-untuk-bayi-berusia-4-12-bulan-0-alodokter.jpg",
+      "tag": "NUTRISI",
+      "title": "Pilihan Makanan Sehat untuk Bayi Berusia 4-12 Bulan",
+      "excerpt": "Makanan sehat untuk bayi bisa Bunda kenali saat usia Si Kecil memasuki 4–6 bulan. Bunda bisa mulai memberinya sebagai makanan pendamping ASI. Tak hanya sekadar memenuhi kebutuhan nutrisi Si Kecil yang semakin meningkat, makanan sehat ini juga baik untuk tumbuh kembangnya.",
+      "readTime": "5 menit baca",
+      "url": "https://www.alodokter.com/pilihan-makanan-sehat-untuk-bayi-berusia-4-12-bulan"
+    },
+    {
+      "id": 8,
+      "image": "https://ayosehat.kemkes.go.id/__asset/__images/content/a8ea1441748bec0bac2f0d658b1754ae.png",
+      "tag": "TUMBUH KEMBANG",
+      "title": "Tips 1000 Hari Pertama Kehidupan Bayi",
+      "excerpt": "“Saat bayi ibu baru lahir, Air Susu Ibu (ASI) adalah makanan terbaik yang bisa ibu berikan untuk bayi. Tubuh ibu sudah disiapkan bisa memberikan ASI saat bayi lahir ke dunia.”",
+      "readTime": "5 menit baca",
+      "url": "https://ayosehat.kemkes.go.id/1000-hari-pertama-kehidupan/category/bayi"
+    },
+    {
+      "id": 9,
+      "image": "https://www.nutriclub.co.id/_default_upload_bucket/image-thumb__543541__banner-detail-desktop/memperhitungkan-konsumsi-asi-si-kecil-NUTRICLUB-DESKTOP.webp",
+      "tag": "ASI",
+      "title": "Cara Memenuhi Kebutuhan ASI Bayi 0-6 Bulan",
+      "excerpt": "Memberikan ASI eksklusif selama enam bulan pertama kehidupan merupakan langkah penting untuk mendukung tumbuh kembang bayi. Sebab, ASI adalah satu-satunya sumber nutrisi terlengkap dan unik bagi bayi. ",
+      "readTime": "5 menit baca",
+      "url": "https://www.nutriclub.co.id/artikel/nutrisi/menyusui/memperhitungkan-konsumsi-asi-si-kecil"
     }
   ]
 }

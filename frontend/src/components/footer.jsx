@@ -3,6 +3,7 @@ import doctorImg from "../assets/doctorImg.png";
 import logoImg from "../assets/logoFooter.png";
 
 function Footer({ onLoginClick }) {
+  
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
@@ -20,6 +21,7 @@ function Footer({ onLoginClick }) {
       window.scrollTo({ top: offsetPosition, behavior: "smooth" });
     }
   };
+
   return (
     <footer className="relative w-full">
       {/* Elips cembung ke ATAS */}
@@ -39,10 +41,6 @@ function Footer({ onLoginClick }) {
           {/* ===== LOGO + NAMA ===== */}
           <div className="flex flex-col items-center pt-2 pb-8">
             <div className="flex items-center gap-3">
-              {/*
-                Logo logoFooter.png kemungkinan ikonnya transparan/putih.
-                Kita bungkus dengan lingkaran putih agar terlihat di background merah.
-              */}
               <div className="h-16 w-16 rounded-full bg-white flex items-center justify-center flex-shrink-0">
                 <img
                   src={logoImg}
@@ -58,9 +56,11 @@ function Footer({ onLoginClick }) {
 
           {/* ===== KONTEN TENGAH ===== */}
           <div className="flex flex-col items-center gap-10 md:flex-row md:items-end md:justify-between">
-            {/* SISI KIRI: Bubble + Dokter + Email */}
-            <div className="flex flex-col items-start gap-2">
-              {/* Baris bubble + dokter */}
+            
+            {/* SISI KIRI (Desktop): Bubble + Dokter, dan Email di bawah mereka */}
+            <div className="flex flex-col items-center md:items-start gap-4">
+              
+              {/* Baris Bubble + Dokter */}
               <div className="flex items-end gap-3">
                 {/* Speech Bubble */}
                 <div className="relative mb-6 max-w-[200px] rounded-[24px] border-2 border-gray-200 bg-white px-5 py-3 text-[12px] font-bold leading-snug text-[#8B1E1E] shadow-md md:text-[13px]">
@@ -83,43 +83,59 @@ function Footer({ onLoginClick }) {
                   className="h-[150px] object-contain drop-shadow-xl md:h-[180px] flex-shrink-0"
                 />
               </div>
+
+              {/* Email Sisi Kiri (Hanya muncul di Desktop di bawah bubble & dokter) */}
+              <a
+                href="mailto:nutribyadmin@gmail.com"
+                className="hidden md:block text-[12px] text-white/80 hover:text-white transition-colors pl-2"
+                aria-label="Email support"
+              >
+                ✉ nutribyadmin@gmail.com
+              </a>
             </div>
 
-            {/* SISI KANAN: Nav Links */}
-            <div className="grid grid-cols-2 gap-x-16 gap-y-3 text-center text-[14px] font-bold text-white md:text-[15px] pb-4">
+            {/* SISI KANAN: Nav Links (Dan tempat Email pas layar kecil) */}
+            <div className="flex flex-col items-center gap-6">
+              {/* Nav Links */}
+              <div className="grid grid-cols-2 gap-x-16 gap-y-3 text-center text-[14px] font-bold text-white md:text-[15px] pb-4">
+                <a
+                  href="#tentang"
+                  className="hover:underline opacity-90 transition-opacity hover:opacity-100"
+                >
+                  Tentang
+                </a>
+                <a
+                  href="#fitur"
+                  className="hover:underline opacity-90 transition-opacity hover:opacity-100"
+                >
+                  Fitur
+                </a>
+                <a
+                  href="#cara-kerja"
+                  className="hover:underline opacity-90 transition-opacity hover:opacity-100"
+                >
+                  Cara Kerja
+                </a>
+                
+                {/* Perubahan pada Menu Beranda */}
+                <button
+                  onClick={onLoginClick}
+                  className="text-center font-bold text-white hover:underline opacity-90 transition-opacity hover:opacity-100"
+                >
+                  Beranda
+                </button>
+              </div>
+
+              {/* Email Sisi Kanan (Hanya muncul di Mobile di bawah nav link) */}
               <a
-                href="#tentang"
-                className="hover:underline opacity-90 transition-opacity hover:opacity-100"
+                href="mailto:nutribyadmin@gmail.com"
+                className="block md:hidden text-[12px] text-white/80 hover:text-white transition-colors"
+                aria-label="Email support"
               >
-                Tentang
-              </a>
-              <a
-                href="#fitur"
-                className="hover:underline opacity-90 transition-opacity hover:opacity-100"
-              >
-                Fitur
-              </a>
-              <a
-                href="#cara-kerja"
-                className="hover:underline opacity-90 transition-opacity hover:opacity-100"
-              >
-                Cara Kerja
-              </a>
-              <a
-                href="#tentang"
-                className="hover:underline opacity-90 transition-opacity hover:opacity-100"
-              >
-                Beranda
+                ✉ nutribyadmin@gmail.com
               </a>
             </div>
-            {/* Email — di bawah bubble & dokter, terpisah */}
-            <a
-              href="mailto:nutribyadmin@gmail.com"
-              className="text-[11px] text-white/80 hover:text-white transition-colors md:text-[12px]"
-              aria-label="Email support"
-            >
-              ✉ nutribyadmin@gmail.com
-            </a>
+
           </div>
 
           {/* ===== COPYRIGHT ===== */}
