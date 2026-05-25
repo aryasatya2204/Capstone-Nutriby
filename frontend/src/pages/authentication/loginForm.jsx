@@ -20,7 +20,7 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
     setForm({ ...form, [name]: value });
     setError("");
 
-    // Validasi email real-time: hanya tampil kalau user sudah ngetik @
+    // validasi email real-time
     if (name === "email") {
       if (value.includes("@") && !isGmail(value)) {
         setEmailError("Email harus menggunakan @gmail.com");
@@ -30,7 +30,7 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
     }
   };
 
-  // Tombol Masuk hanya aktif jika email valid gmail
+  // tombol masuk hanya aktif jika email valid gmail
   const isFormValid = isGmail(form.email) && form.password.length > 0;
 
   const handleManualLogin = async () => {
@@ -99,7 +99,7 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
     }
   };
 
-  // ── POPUP SUKSES ──
+  // popup sukses
   if (showSuccess) {
     return (
       <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
@@ -121,7 +121,7 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
     );
   }
 
-  // ── FORM LOGIN ──
+  // form login
   return (
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
@@ -143,7 +143,6 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
         )}
 
         <div className="space-y-6">
-          {/* EMAIL */}
           <div className="flex flex-col">
             <label className="text-sm font-medium mb-1 uppercase opacity-90">
               Email
@@ -157,7 +156,6 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
               className={`w-full bg-transparent border-b-2 py-2 outline-none transition-colors placeholder:opacity-40
                 ${emailError ? "border-red-300" : "border-white/50 focus:border-white"}`}
             />
-            {/* Pesan validasi email muncul real-time */}
             {emailError && (
               <p className="mt-1.5 flex items-center gap-1 text-[12px] text-red-300">
                 <span>⚠</span> {emailError}
@@ -165,7 +163,6 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
             )}
           </div>
 
-          {/* PASSWORD */}
           <div className="flex flex-col">
             <label className="text-sm font-medium mb-1 uppercase opacity-90">
               Password
@@ -180,7 +177,6 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
           </div>
         </div>
 
-        {/* Tombol disabled kalau email bukan gmail atau password kosong */}
         <button
           onClick={handleManualLogin}
           disabled={isLoading || !isFormValid}

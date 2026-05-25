@@ -3,15 +3,16 @@ import doctorImg from "../assets/doctorImg.png";
 import logoImg from "../assets/logoFooter.png";
 
 function Footer({ onLoginClick }) {
-  
   const [isScrolled, setIsScrolled] = useState(false);
 
+  // deteksi scroll efek navbar
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // scroll smooth ke id section
   const scrollTo = (id) => {
     const element = document.getElementById(id);
     if (element) {
@@ -24,7 +25,7 @@ function Footer({ onLoginClick }) {
 
   return (
     <footer className="relative w-full">
-      {/* Elips cembung ke ATAS */}
+      {/* elips cembung ke atas */}
       <div className="w-full overflow-hidden leading-[0]">
         <svg
           viewBox="0 0 1200 120"
@@ -35,10 +36,10 @@ function Footer({ onLoginClick }) {
         </svg>
       </div>
 
-      {/* Badan footer */}
+      {/* badan footer */}
       <div className="bg-[#8B1E1E] pb-10">
         <div className="relative mx-auto max-w-[1200px] px-6 md:px-14">
-          {/* ===== LOGO + NAMA ===== */}
+          {/* logo dan nama */}
           <div className="flex flex-col items-center pt-2 pb-8">
             <div className="flex items-center gap-3">
               <div className="h-16 w-16 rounded-full bg-white flex items-center justify-center flex-shrink-0">
@@ -54,18 +55,14 @@ function Footer({ onLoginClick }) {
             </div>
           </div>
 
-          {/* ===== KONTEN TENGAH ===== */}
+          {/* konten tengah */}
           <div className="flex flex-col items-center gap-10 md:flex-row md:items-end md:justify-between">
-            
-            {/* SISI KIRI (Desktop): Bubble + Dokter, dan Email di bawah mereka */}
+            {/* sisi kiri desktop */}
             <div className="flex flex-col items-center md:items-start gap-4">
-              
-              {/* Baris Bubble + Dokter */}
               <div className="flex items-end gap-3">
-                {/* Speech Bubble */}
+                {/* bubble text */}
                 <div className="relative mb-6 max-w-[200px] rounded-[24px] border-2 border-gray-200 bg-white px-5 py-3 text-[12px] font-bold leading-snug text-[#8B1E1E] shadow-md md:text-[13px]">
                   Pantau tumbuh kembang anak. <br /> Ayo daftar sekarang!
-                  {/* Ekor bubble ke kanan */}
                   <div
                     className="absolute -right-[10px] top-1/2 -translate-y-1/2 w-0 h-0"
                     style={{
@@ -76,7 +73,6 @@ function Footer({ onLoginClick }) {
                   />
                 </div>
 
-                {/* Gambar Dokter */}
                 <img
                   src={doctorImg}
                   alt="dokter"
@@ -84,7 +80,7 @@ function Footer({ onLoginClick }) {
                 />
               </div>
 
-              {/* Email Sisi Kiri (Hanya muncul di Desktop di bawah bubble & dokter) */}
+              {/* email desktop */}
               <a
                 href="mailto:nutribyadmin@gmail.com"
                 className="hidden md:block text-[12px] text-white/80 hover:text-white transition-colors pl-2"
@@ -94,9 +90,8 @@ function Footer({ onLoginClick }) {
               </a>
             </div>
 
-            {/* SISI KANAN: Nav Links (Dan tempat Email pas layar kecil) */}
+            {/* sisi kanan links */}
             <div className="flex flex-col items-center gap-6">
-              {/* Nav Links */}
               <div className="grid grid-cols-2 gap-x-16 gap-y-3 text-center text-[14px] font-bold text-white md:text-[15px] pb-4">
                 <a
                   href="#tentang"
@@ -116,8 +111,6 @@ function Footer({ onLoginClick }) {
                 >
                   Cara Kerja
                 </a>
-                
-                {/* Perubahan pada Menu Beranda */}
                 <button
                   onClick={onLoginClick}
                   className="text-center font-bold text-white hover:underline opacity-90 transition-opacity hover:opacity-100"
@@ -126,7 +119,7 @@ function Footer({ onLoginClick }) {
                 </button>
               </div>
 
-              {/* Email Sisi Kanan (Hanya muncul di Mobile di bawah nav link) */}
+              {/* email mobile */}
               <a
                 href="mailto:nutribyadmin@gmail.com"
                 className="block md:hidden text-[12px] text-white/80 hover:text-white transition-colors"
@@ -135,10 +128,9 @@ function Footer({ onLoginClick }) {
                 ✉ nutribyadmin@gmail.com
               </a>
             </div>
-
           </div>
 
-          {/* ===== COPYRIGHT ===== */}
+          {/* copyright */}
           <div className="mt-10 border-t border-white/10 pt-5 flex flex-col items-center gap-2">
             <p className="text-[12px] text-white/80 md:text-[13px]">
               © 2026 Nutriby. All rights reserved.

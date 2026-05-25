@@ -5,6 +5,7 @@ import gambarDashboard from "../assets/gambarDashboard.jpeg";
 import RecipeDetailPopup from "./Features/RecipeDetailPopup";
 import { useAuth } from "../context/authContext";
 
+// hitung hari buat nentuin menu mpasi
 const calculateDayOffset = (createdAt) => {
   if (!createdAt) return 0;
   const start = new Date(createdAt);
@@ -24,6 +25,7 @@ export default function Dashboard() {
   const [masterIngredients, setMasterIngredients] = useState([]);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [salaryError, setSalaryError] = useState("");
 
   const [editFormData, setEditFormData] = useState({
     allergy_ids: [],
@@ -37,6 +39,7 @@ export default function Dashboard() {
   const [todayMenu, setTodayMenu] = useState(null);
   const [selectedMenuDetail, setSelectedMenuDetail] = useState(null);
 
+  // ambil data anak + menu hari ini dari api
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -47,12 +50,11 @@ export default function Dashboard() {
         const data = await res.json();
         if (!Array.isArray(data) || data.length === 0) return;
 
-        // Prioritas: cari anak yang activeChild-nya cocok; fallback ke index 0
         const targetId = contextActiveChild?.id;
         const child =
           (targetId ? data.find((c) => c.id === targetId) : null) ?? data[0];
         setChildData(child);
-        // Mengambil menu hari ini secara akurat dari DB Plan yang tersimpan
+
         if (child.meal_plans && child.meal_plans.length > 0) {
           const activeWeeklyPlan = child.meal_plans.find(
             (p) => p.plan_type === "mingguan",
@@ -86,6 +88,7 @@ export default function Dashboard() {
     fetchDashboardData();
   }, [contextActiveChild?.id]);
 
+  // ambil tips nutrisi harian si bot
   useEffect(() => {
     const fetchDailyInsight = async () => {
       if (!childData?.id) return;
@@ -108,6 +111,7 @@ export default function Dashboard() {
     fetchDailyInsight();
   }, [childData?.id]);
 
+  // ambil list master alergi ama bahan makanan pas web pertama buka
   useEffect(() => {
     const fetchMaster = async () => {
       const token = localStorage.getItem("token");
@@ -129,6 +133,7 @@ export default function Dashboard() {
     fetchMaster();
   }, []);
 
+  // masukin data anak yg lama ke form edit pas modal dibuka
   useEffect(() => {
     if (showEditModal && childData) {
       setEditFormData({
@@ -143,6 +148,7 @@ export default function Dashboard() {
     }
   }, [showEditModal, childData]);
 
+  // bersihin underscore ama bikin huruf kapital di awal kata
   const formatLabel = (str) => {
     if (!str) return "";
     return str
@@ -152,6 +158,7 @@ export default function Dashboard() {
       .join(" ");
   };
 
+  // hitung umur anak detail sampe ke hari
   const getAgeDetail = (dob) => {
     if (!dob) return { months: 0, days: 0 };
     const birthDate = new Date(dob);
@@ -170,6 +177,7 @@ export default function Dashboard() {
     return { months: months < 0 ? 0 : months, days };
   };
 
+  // handle pilih/batal alergi + matiin kesukaan klo bahannya bikin alergi
   const toggleAllergy = (id) => {
     let newAllergies = [...editFormData.allergy_ids];
     if (newAllergies.includes(id))
@@ -207,6 +215,7 @@ export default function Dashboard() {
     });
   };
 
+  // handle checklist makanan kesukaan
   const togglePreference = (id, isDisabled) => {
     if (isDisabled) return;
     let newPrefs = [...editFormData.preference_ids];
@@ -215,17 +224,27 @@ export default function Dashboard() {
     setEditFormData({ ...editFormData, preference_ids: newPrefs });
   };
 
+  // formatting titik rupiah + validasi ketikan di gaji
   const handleSalaryChange = (e) => {
     const rawValue = e.target.value.replace(/\D/g, "");
-    const formattedValue = rawValue.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    const formattedValue = rawValue.replace(/\B(?=(\d{3})+(`?!\d))/g, ".");
     setEditFormData({ ...editFormData, parent_salary: formattedValue });
+
+    const numericValue = parseInt(rawValue, 10);
+    if (rawValue && numericValue < 500000) {
+      setSalaryError("Minimal pendapatan orang tua adalah Rp 500.000");
+    } else {
+      setSalaryError("");
+    }
   };
 
+  // cek ulang gaji pas mau di-save + hit api simpan data
   const handleSaveEdit = async () => {
     if (!editFormData.parent_salary) {
       alert("Pendapatan orang tua tidak boleh kosong.");
       return;
     }
+    if (salaryError) return;
     setIsSaving(true);
     try {
       const token = localStorage.getItem("token");
@@ -290,13 +309,14 @@ export default function Dashboard() {
   const costMingguan = costBulanan > 0 ? costBulanan / 4 : 0;
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#F3EFEA] font-['Lato'] relative">
+    <div className="flex min-h-screen flex-col bg-[#F3EFEA] font-['Lato'] relative animate-[fadeIn_0.5s_ease-out]">
       <NavbarDashboard />
 
-      <main className="mx-auto w-full max-w-7xl flex-grow p-4 py-8 md:p-8">
+      <main className="mx-auto w-full max-w-7xl flex-grow p-4 py-8 md:p-8 animate-[slideUp_0.5s_ease-out_forwards]">
+        {/* bagian hero welcome banner */}
         <div className="mb-8 overflow-hidden rounded-3xl bg-white p-6 shadow-sm md:p-10 relative flex items-center justify-between">
           <div className="relative z-10 max-w-2xl">
-            <h1 className="text-3xl font-extrabold text-[#8B2020] md:text-5xl uppercase leading-tight">
+            <h1 className="text-3xl font-bold text-[#8B2020] md:text-5xl uppercase leading-tight">
               Selamat Datang,
               <br />
               Ayah & Bunda!
@@ -326,6 +346,7 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
           <div className="flex flex-col gap-6 lg:col-span-1">
+            {/* box data info tinggi & berat anak */}
             <div className="rounded-3xl bg-white p-6 shadow-sm border border-gray-100">
               <h2 className="mb-4 text-lg font-bold text-gray-800 border-b pb-2">
                 Perkembangan Terbaru Si Kecil
@@ -446,6 +467,7 @@ export default function Dashboard() {
               )}
             </div>
 
+            {/* ringkasan data profil anak */}
             <div className="rounded-3xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col items-center">
               <h2 className="mb-4 text-lg font-bold text-[#8B2020] uppercase">
                 Ringkasan Data
@@ -475,7 +497,7 @@ export default function Dashboard() {
                         key={a.allergy_category.id}
                         className="rounded-full bg-red-100 px-3 py-1 text-sm font-bold text-red-600"
                       >
-                        {a.allergy_category.name}
+                        {formatLabel(a.allergy_category.name)}
                       </span>
                     ))}
                   </div>
@@ -494,7 +516,7 @@ export default function Dashboard() {
                     childData.preferences.map((p) => (
                       <span
                         key={p.ingredient.id}
-                        className="rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700"
+                        className="rounded-full bg-green-100 px-3 py-1 text-[14px] font-bold text-green-700"
                       >
                         {p.ingredient.name}
                       </span>
@@ -508,7 +530,7 @@ export default function Dashboard() {
               </div>
               <button
                 onClick={() => setShowEditModal(true)}
-                className="rounded-full bg-red-50 px-6 py-2.5 text-sm font-bold text-[#8B2020] transition-colors hover:bg-red-100"
+                className="rounded-full bg-red-50 px-6 py-2.5 text-sm font-bold text-[#8B2020] transition-all duration-300 hover:bg-red-100 hover:scale-105 active:scale-95"
               >
                 Edit Data Anak
               </button>
@@ -516,6 +538,7 @@ export default function Dashboard() {
           </div>
 
           <div className="flex flex-col gap-6 lg:col-span-2">
+            {/* menu makan harian */}
             <div className="rounded-3xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col min-h-[350px]">
               <h2 className="text-2xl font-bold text-[#8B2020] mb-6 mt-4 text-center">
                 Rekomendasi Menu Hari ini
@@ -557,7 +580,7 @@ export default function Dashboard() {
                         <div
                           key={slot}
                           onClick={() => menu && setSelectedMenuDetail(menu)}
-                          className={`flex items-center gap-4 rounded-2xl border ${border} ${bg} p-4 transition-colors ${menu ? "cursor-pointer" : ""}`}
+                          className={`flex items-center gap-4 rounded-2xl border ${border} ${bg} p-4 transition-all duration-300 transform hover:-translate-y-0.5 shadow-sm hover:shadow-md ${menu ? "cursor-pointer" : ""}`}
                         >
                           <div className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-white shadow-sm overflow-hidden">
                             {menu?.image_url ? (
@@ -619,6 +642,7 @@ export default function Dashboard() {
               )}
             </div>
 
+            {/* insight ai nutribot */}
             {activeMealPlan && (
               <div className="rounded-3xl bg-white p-6 shadow-sm border border-gray-100 text-left">
                 <h3 className="font-bold text-lg text-black mb-3">
@@ -642,6 +666,7 @@ export default function Dashboard() {
               </div>
             )}
 
+            {/* daily tips section */}
             <div className="rounded-3xl bg-red-50 p-6 shadow-sm border border-red-100 text-center">
               <h3 className="font-bold text-[#8B2020] mb-2 uppercase text-sm">
                 Tips Nutrisi Hari Ini
@@ -672,217 +697,235 @@ export default function Dashboard() {
         />
       )}
 
-      {showEditModal && (
+      <div
+        className={`fixed inset-0 z-[400] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm transition-opacity duration-300 ${
+          showEditModal
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
+        }`}
+        onClick={() => {
+          setOpenDropdown(null);
+          setShowEditModal(false);
+        }}
+      >
         <div
-          className="fixed inset-0 z-[400] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm transition-opacity"
-          onClick={() => {
-            setOpenDropdown(null);
-            setShowEditModal(false);
-          }}
+          className={`w-full max-w-[450px] rounded-[2rem] bg-white p-8 shadow-2xl transition-all duration-300 transform ${
+            showEditModal ? "scale-100 opacity-100" : "scale-95 opacity-0"
+          }`}
+          onClick={(e) => e.stopPropagation()}
         >
-          <div
-            className="w-full max-w-[450px] rounded-[2rem] bg-white p-8 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-2xl font-bold text-[#8B2020] mb-2">
-              Edit Data Anak
-            </h2>
-            <p className="text-sm text-gray-500 mb-6">
-              Ubah riwayat alergi, makanan, dan pendapatan.
-            </p>
-            <div className="flex flex-col gap-5">
-              <div className="flex flex-col relative">
-                <label className="mb-1 text-sm font-bold text-gray-700">
-                  Alergi (Bisa pilih lebih dari satu)
-                </label>
-                <div
-                  className="rounded-lg border border-gray-300 bg-white p-2.5 outline-none cursor-pointer flex justify-between items-center hover:border-gray-400 transition-colors"
-                  onClick={() =>
-                    setOpenDropdown(
-                      openDropdown === "allergy" ? null : "allergy",
-                    )
-                  }
+          <h2 className="text-2xl font-bold text-[#8B2020] mb-2">
+            Edit Data Anak
+          </h2>
+          <p className="text-sm text-gray-500 mb-6">
+            Ubah riwayat alergi, makanan, dan pendapatan.
+          </p>
+          <div className="flex flex-col gap-5">
+            {/* input dropdown pilihan alergi  */}
+            <div className="flex flex-col relative">
+              <label className="mb-1 text-sm font-bold text-gray-700">
+                Alergi (Bisa pilih lebih dari satu)
+              </label>
+              <div
+                className="rounded-lg border border-gray-300 bg-white p-2.5 outline-none cursor-pointer flex justify-between items-center hover:border-gray-400 transition-colors"
+                onClick={() =>
+                  setOpenDropdown(openDropdown === "allergy" ? null : "allergy")
+                }
+              >
+                <span className="truncate text-gray-700 text-sm">
+                  {editFormData.allergy_ids.length > 0
+                    ? editFormData.allergy_ids
+                        .map((id) => {
+                          const item = masterAllergies.find((a) => a.id == id);
+                          return item
+                            ? formatLabel(item.name)
+                            : "ID Tidak Ditemukan";
+                        })
+                        .join(", ")
+                    : "Pilih alergi..."}
+                </span>
+                <span
+                  className={`text-gray-500 text-xs transition-transform duration-300 ${openDropdown === "allergy" ? "rotate-180" : ""}`}
                 >
-                  <span className="truncate text-gray-700 text-sm">
-                    {editFormData.allergy_ids.length > 0
-                      ? editFormData.allergy_ids
-                          .map((id) => {
-                            const item = masterAllergies.find(
-                              (a) => a.id == id,
-                            );
-                            return item
-                              ? formatLabel(item.name)
-                              : "ID Tidak Ditemukan";
-                          })
-                          .join(", ")
-                      : "Pilih alergi..."}
-                  </span>
-                  <span className="text-gray-500 text-xs">
-                    {openDropdown === "allergy" ? "▲" : "▼"}
-                  </span>
-                </div>
-                {openDropdown === "allergy" && (
-                  <div className="absolute top-full left-0 right-0 z-[50] w-full max-h-48 overflow-y-auto bg-white rounded-xl mt-1 p-2 shadow-xl border border-gray-100">
-                    {masterAllergies.length === 0 ? (
-                      <p className="p-3 text-sm text-center text-red-500">
-                        Data Master Alergi kosong dari Database!
-                      </p>
-                    ) : (
-                      masterAllergies.map((a) => (
-                        <label
-                          key={a.id}
-                          className="flex items-center gap-3 p-2.5 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={editFormData.allergy_ids.includes(a.id)}
-                            onChange={() => toggleAllergy(a.id)}
-                            className="w-4 h-4 accent-[#8B2020]"
-                          />
-                          <span className="text-sm font-medium text-gray-700">
-                            {formatLabel(a.name)}
-                          </span>
-                        </label>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-col relative">
-                <label className="mb-1 text-sm font-bold text-gray-700">
-                  Makanan favorit (Pilih lebih dari satu)
-                </label>
-                <div
-                  className="rounded-lg border border-gray-300 bg-white p-2.5 outline-none cursor-pointer flex justify-between items-center hover:border-gray-400 transition-colors"
-                  onClick={() =>
-                    setOpenDropdown(
-                      openDropdown === "preference" ? null : "preference",
-                    )
-                  }
-                >
-                  <span className="truncate text-gray-700 text-sm">
-                    {editFormData.preference_ids.length > 0
-                      ? editFormData.preference_ids
-                          .map((id) => {
-                            const item = masterIngredients.find(
-                              (i) => i.id == id,
-                            );
-                            return item
-                              ? formatLabel(item.name)
-                              : "ID Tidak Ditemukan";
-                          })
-                          .join(", ")
-                      : "Pilih makanan favorit..."}
-                  </span>
-                  <span className="text-gray-500 text-xs">
-                    {openDropdown === "preference" ? "▲" : "▼"}
-                  </span>
-                </div>
-                {openDropdown === "preference" && (
-                  <div className="absolute top-full left-0 right-0 z-[50] w-full max-h-48 overflow-y-auto bg-white rounded-xl mt-1 p-2 shadow-xl border border-gray-100">
-                    {masterIngredients.length === 0 ? (
-                      <p className="p-3 text-sm text-center text-red-500">
-                        Data Master Makanan kosong dari Database!
-                      </p>
-                    ) : (
-                      masterIngredients.map((i) => {
-                        const selectedCategories = masterAllergies.filter((a) =>
-                          editFormData.allergy_ids.includes(a.id),
-                        );
-                        const isDisabled = selectedCategories.some((cat) => {
-                          const matchCategory = i.name
-                            .toLowerCase()
-                            .includes(cat.name.toLowerCase());
-                          const matchItem =
-                            cat.items &&
-                            cat.items.some(
-                              (item) =>
-                                i.name
-                                  .toLowerCase()
-                                  .includes(item.item_name.toLowerCase()) ||
-                                item.item_name
-                                  .toLowerCase()
-                                  .includes(i.name.toLowerCase()),
-                            );
-                          return matchCategory || matchItem;
-                        });
-                        return (
-                          <label
-                            key={i.id}
-                            className={`flex items-center gap-3 p-2.5 rounded-lg transition-colors ${isDisabled ? "bg-red-50 opacity-60 cursor-not-allowed" : "hover:bg-green-50 cursor-pointer"}`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={editFormData.preference_ids.includes(
-                                i.id,
-                              )}
-                              onChange={() =>
-                                togglePreference(i.id, isDisabled)
-                              }
-                              disabled={isDisabled}
-                              className={`w-4 h-4 ${isDisabled ? "accent-gray-400" : "accent-green-600"}`}
-                            />
-                            <span
-                              className={`text-sm font-medium flex-1 ${isDisabled ? "text-red-700 line-through" : "text-gray-700"}`}
-                            >
-                              {formatLabel(i.name)}
-                            </span>
-                            {isDisabled && (
-                              <span className="text-[10px] text-red-600 font-bold bg-red-100 px-2 py-0.5 rounded-full">
-                                Alergi
-                              </span>
-                            )}
-                          </label>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
+                  ▼
+                </span>
               </div>
               <div
-                className="flex flex-col relative"
-                onClick={() => setOpenDropdown(null)}
+                className={`absolute top-full left-0 right-0 z-[50] w-full bg-white rounded-xl mt-1 overflow-y-auto shadow-xl border border-gray-100 transition-all duration-300 ${
+                  openDropdown === "allergy"
+                    ? "max-h-48 opacity-100 p-2"
+                    : "max-h-0 opacity-0 p-0 pointer-events-none"
+                }`}
               >
-                <label className="mb-1 text-sm font-bold text-gray-700">
-                  Pendapatan Orang Tua per Bulan (Rp)
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  name="parent_salary"
-                  placeholder="Contoh: 5.000.000"
-                  value={editFormData.parent_salary}
-                  onChange={handleSalaryChange}
-                  className="rounded-lg border border-gray-300 bg-white p-2.5 text-sm outline-none focus:border-[#8B2020] transition-colors"
-                />
+                {masterAllergies.length === 0 ? (
+                  <p className="p-3 text-sm text-center text-red-500">
+                    Data Master Alergi kosong dari Database!
+                  </p>
+                ) : (
+                  masterAllergies.map((a) => (
+                    <label
+                      key={a.id}
+                      className="flex items-center gap-3 p-2.5 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={editFormData.allergy_ids.includes(a.id)}
+                        onChange={() => toggleAllergy(a.id)}
+                        className="w-4 h-4 accent-[#8B2020]"
+                      />
+                      <span className="text-sm font-medium text-gray-700">
+                        {formatLabel(a.name)}
+                      </span>
+                    </label>
+                  ))
+                )}
               </div>
             </div>
+
+            {/* input dropdown makanan favorit */}
+            <div className="flex flex-col relative">
+              <label className="mb-1 text-sm font-bold text-gray-700">
+                Makanan favorit (Pilih lebih dari satu)
+              </label>
+              <div
+                className="rounded-lg border border-gray-300 bg-white p-2.5 outline-none cursor-pointer flex justify-between items-center hover:border-gray-400 transition-colors"
+                onClick={() =>
+                  setOpenDropdown(
+                    openDropdown === "preference" ? null : "preference",
+                  )
+                }
+              >
+                <span className="truncate text-gray-700 text-sm">
+                  {editFormData.preference_ids.length > 0
+                    ? editFormData.preference_ids
+                        .map((id) => {
+                          const item = masterIngredients.find(
+                            (i) => i.id == id,
+                          );
+                          return item
+                            ? formatLabel(item.name)
+                            : "ID Tidak Ditemukan";
+                        })
+                        .join(", ")
+                    : "Pilih makanan favorit..."}
+                </span>
+                <span
+                  className={`text-gray-500 text-xs transition-transform duration-300 ${openDropdown === "preference" ? "rotate-180" : ""}`}
+                >
+                  ▼
+                </span>
+              </div>
+              <div
+                className={`absolute top-full left-0 right-0 z-[50] w-full bg-white rounded-xl mt-1 overflow-y-auto shadow-xl border border-gray-100 transition-all duration-300 ${
+                  openDropdown === "preference"
+                    ? "max-h-48 opacity-100 p-2"
+                    : "max-h-0 opacity-0 p-0 pointer-events-none"
+                }`}
+              >
+                {masterIngredients.length === 0 ? (
+                  <p className="p-3 text-sm text-center text-red-500">
+                    Data Master Makanan kosong dari Database!
+                  </p>
+                ) : (
+                  masterIngredients.map((i) => {
+                    const selectedCategories = masterAllergies.filter((a) =>
+                      editFormData.allergy_ids.includes(a.id),
+                    );
+                    const isDisabled = selectedCategories.some((cat) => {
+                      const matchCategory = i.name
+                        .toLowerCase()
+                        .includes(cat.name.toLowerCase());
+                      const matchItem =
+                        cat.items &&
+                        cat.items.some(
+                          (item) =>
+                            i.name
+                              .toLowerCase()
+                              .includes(item.item_name.toLowerCase()) ||
+                            item.item_name
+                              .toLowerCase()
+                              .includes(i.name.toLowerCase()),
+                        );
+                      return matchCategory || matchItem;
+                    });
+                    return (
+                      <label
+                        key={i.id}
+                        className={`flex items-center gap-3 p-2.5 rounded-lg transition-colors ${isDisabled ? "bg-red-50 opacity-60 cursor-not-allowed" : "hover:bg-green-50 cursor-pointer"}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={editFormData.preference_ids.includes(i.id)}
+                          onChange={() => togglePreference(i.id, isDisabled)}
+                          disabled={isDisabled}
+                          className={`w-4 h-4 ${isDisabled ? "accent-gray-400" : "accent-green-600"}`}
+                        />
+                        <span
+                          className={`text-sm font-medium flex-1 ${isDisabled ? "text-red-700 line-through" : "text-gray-700"}`}
+                        >
+                          {formatLabel(i.name)}
+                        </span>
+                        {isDisabled && (
+                          <span className="text-[10px] text-red-600 font-bold bg-red-100 px-2 py-0.5 rounded-full">
+                            Alergi
+                          </span>
+                        )}
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* input text nominal gaji */}
             <div
-              className="mt-8 flex justify-end gap-3"
+              className="flex flex-col relative"
               onClick={() => setOpenDropdown(null)}
             >
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="rounded-full px-5 py-2 text-sm font-bold text-gray-500 hover:bg-gray-100 transition-colors"
-                disabled={isSaving}
-              >
-                Batal
-              </button>
-              <button
-                onClick={handleSaveEdit}
-                className="rounded-full bg-[#8B2020] px-6 py-2 text-sm font-bold text-white shadow-md hover:bg-red-800 transition-colors disabled:opacity-70 flex items-center justify-center min-w-[150px]"
-                disabled={isSaving}
-              >
-                {isSaving ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                ) : (
-                  "Simpan Perubahan"
-                )}
-              </button>
+              <label className="mb-1 text-sm font-bold text-gray-700">
+                Pendapatan Orang Tua per Bulan (Rp)
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                name="parent_salary"
+                placeholder="Contoh: 5.000.000"
+                value={editFormData.parent_salary}
+                onChange={handleSalaryChange}
+                className={`rounded-lg border bg-white p-2.5 text-sm outline-none transition-colors ${salaryError ? "border-red-500 focus:border-red-500" : "border-gray-300 focus:border-[#8B2020]"}`}
+              />
+              {salaryError && (
+                <p className="mt-1 text-xs text-red-600 font-medium flex items-center gap-1">
+                  <span>⚠</span> {salaryError}
+                </p>
+              )}
             </div>
           </div>
+          <div
+            className="mt-8 flex justify-end gap-3"
+            onClick={() => setOpenDropdown(null)}
+          >
+            <button
+              onClick={() => setShowEditModal(false)}
+              className="rounded-full px-5 py-2 text-sm font-bold text-gray-500 hover:bg-gray-100 transition-all duration-200 active:scale-95"
+              disabled={isSaving}
+            >
+              Batal
+            </button>
+            <button
+              onClick={handleSaveEdit}
+              className="rounded-full bg-[#8B2020] px-6 py-2 text-sm font-bold text-white shadow-md hover:bg-red-800 transition-all duration-200 hover:shadow-lg active:scale-95 disabled:opacity-70 flex items-center justify-center min-w-[150px]"
+              disabled={isSaving || !!salaryError}
+            >
+              {isSaving ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+              ) : (
+                "Simpan Perubahan"
+              )}
+            </button>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -2,7 +2,6 @@ const { PrismaClient } = require("@prisma/client");
 const { PrismaPg } = require("@prisma/adapter-pg");
 const { Pool } = require("pg");
 
-// 1. Import SEMUA helper yang dibutuhkan dari file helper Anda
 const {
   getAgeInMonths,
   calculateLMS,
@@ -18,11 +17,7 @@ const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-/**
- * ============================================================================
- * 1. GET GROWTH HISTORY FOR CHART (SEPARATED)
- * ============================================================================
- */
+// ambil riwayat pertumbuhan anak buat format chart bbi dan tbi
 const getGrowthChartData = async (req, res) => {
   try {
     const { childId } = req.params;
@@ -50,7 +45,6 @@ const getGrowthChartData = async (req, res) => {
       });
     }
 
-    // PERBAIKAN: log.weight diubah jadi log.berat, dan ditambah validasi null safety
     const weightChart = logs.map((log) => ({
       log_id: log.id,
       date_label: log.record_date.toISOString().split("T")[0],
@@ -82,11 +76,7 @@ const getGrowthChartData = async (req, res) => {
   }
 };
 
-/**
- * ============================================================================
- * 2. ADD WEEKLY GROWTH LOG (FULLY INTEGRATED)
- * ============================================================================
- */
+// tambah log pertumbuhan mingguan dan hitung otomatis status z-score who
 const addWeeklyGrowthLog = async (req, res) => {
   try {
     const { childId } = req.params;
@@ -110,7 +100,25 @@ const addWeeklyGrowthLog = async (req, res) => {
     const currentWeight = parseFloat(weight);
     const currentHeight = parseFloat(height);
 
-    // A. TARIK DATA STANDAR WHO DARI DATABASE
+    const lastLog = await prisma.growthLog.findFirst({
+      where: { child_id: childId },
+      orderBy: { record_date: "desc" },
+    });
+
+    // kunci input data jika belum lewat dari 7 hari semenjak log terakhir
+    if (lastLog) {
+      const daysSinceLast =
+        (Date.now() - new Date(lastLog.record_date).getTime()) /
+        (1000 * 60 * 60 * 24);
+      if (daysSinceLast < 7) {
+        const sisaHari = Math.ceil(7 - daysSinceLast);
+        return res.status(429).json({
+          message: `Input terlalu cepat. Tunggu ${sisaHari} hari lagi.`,
+          cooldown_remaining_days: sisaHari,
+        });
+      }
+    }
+
     const whoWFA = await prisma.whoStandard.findFirst({
       where: {
         indicator: "WFA",
@@ -136,26 +144,6 @@ const addWeeklyGrowthLog = async (req, res) => {
       },
     });
 
-    // Tambahkan di addWeeklyGrowthLog, sebelum kalkulasi z-score:
-    const lastLog = await prisma.growthLog.findFirst({
-      where: { child_id: childId },
-      orderBy: { record_date: "desc" },
-    });
-
-    if (lastLog) {
-      const daysSinceLast =
-        (Date.now() - new Date(lastLog.record_date).getTime()) /
-        (1000 * 60 * 60 * 24);
-      if (daysSinceLast < 7) {
-        const sisaHari = Math.ceil(7 - daysSinceLast);
-        return res.status(429).json({
-          message: `Input terlalu cepat. Tunggu ${sisaHari} hari lagi.`,
-          cooldown_remaining_days: sisaHari,
-        });
-      }
-    }
-
-    // B. KALKULASI Z-SCORE & STATUS GIZI
     const zscore_wfa_calc = whoWFA
       ? calculateLMS(currentWeight, whoWFA.l, whoWFA.m, whoWFA.s)
       : null;
@@ -178,7 +166,6 @@ const addWeeklyGrowthLog = async (req, res) => {
         ? getGlobalStatus(status_wfh, status_hfa)
         : "Data Tidak Lengkap";
 
-    // C. TARIK DATA STANDAR AKG & KALKULASI WATERLOW
     const akg = await prisma.akgStandard.findFirst({
       where: {
         gender: child.gender,
@@ -198,7 +185,6 @@ const addWeeklyGrowthLog = async (req, res) => {
     if (akg) {
       const kkalPerKg =
         parseFloat(akg.calories) / parseFloat(akg.base_weight_kg);
-      // Menggunakan fungsi Waterlow baru yang sudah bebas dari bug nilai defisit
       target_kalori = calculateWaterlowCalories(
         zscore_wfh_calc || 0,
         currentWeight,
@@ -212,7 +198,6 @@ const addWeeklyGrowthLog = async (req, res) => {
       target_zinc = parseFloat(akg.zinc);
     }
 
-    // D. SIMPAN KE DATABASE
     const newLog = await prisma.growthLog.create({
       data: {
         child_id: childId,
@@ -235,9 +220,7 @@ const addWeeklyGrowthLog = async (req, res) => {
       },
     });
 
-    // === LOGIKA WAJIB HIT BARU: RE-GENERATE DI BACKGROUND SAAT ADA PERTUMBUHAN BARU ===
     try {
-      // Mengirim flag isUpdate = true agar prompt Gemini menyesuaikan evaluasi berkala
       await executeMealPlanAI(childId, true);
     } catch (aiError) {
       console.error(

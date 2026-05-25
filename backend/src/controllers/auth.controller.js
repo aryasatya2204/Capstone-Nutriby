@@ -1,9 +1,9 @@
-const { PrismaClient } = require('@prisma/client');
-const { PrismaPg } = require('@prisma/adapter-pg');
-const { Pool } = require('pg');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const { OAuth2Client } = require('google-auth-library');
+const { PrismaClient } = require("@prisma/client");
+const { PrismaPg } = require("@prisma/adapter-pg");
+const { Pool } = require("pg");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const { OAuth2Client } = require("google-auth-library");
 
 const connectionString = process.env.DATABASE_URL;
 const pool = new Pool({ connectionString });
@@ -11,9 +11,9 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-const JWT_SECRET = process.env.JWT_SECRET || 'rahasia_nutriby_super_aman_123';
+const JWT_SECRET = process.env.JWT_SECRET || "rahasia_nutriby_super_aman_123";
 
-// --- LOGIN VIA GOOGLE ---
+// login atau registrasi otomatis via google oauth
 const googleLogin = async (req, res) => {
   try {
     const { idToken } = req.body;
@@ -34,25 +34,27 @@ const googleLogin = async (req, res) => {
           name,
           auth_provider: "google",
           provider_id,
-        }
+        },
       });
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, {
+      expiresIn: "7d",
+    });
 
     res.status(200).json({
       message: "Login Google Berhasil!",
       token,
-      user: { id: user.id, name: user.name, email: user.email }
+      user: { id: user.id, name: user.name, email: user.email },
     });
   } catch (error) {
-    res.status(400).json({ message: "Google Login Gagal", error: error.message });
+    res
+      .status(400)
+      .json({ message: "Google Login Gagal", error: error.message });
   }
 };
 
-// ==========================================
-// 1. REGISTRASI MANUAL (DIPERBARUI: RETURN TOKEN)
-// ==========================================
+// registrasi akun baru pakai email dan password manual
 const registerManual = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -69,29 +71,29 @@ const registerManual = async (req, res) => {
         name,
         email,
         password: hashedPassword,
-        auth_provider: "manual"
-      }
+        auth_provider: "manual",
+      },
     });
 
     const token = jwt.sign(
       { id: newUser.id, email: newUser.email },
       JWT_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "7d" },
     );
 
     res.status(201).json({
       message: "Registrasi berhasil!",
       token,
-      user: { id: newUser.id, name: newUser.name, email: newUser.email }
+      user: { id: newUser.id, name: newUser.name, email: newUser.email },
     });
   } catch (error) {
-    res.status(500).json({ message: "Error saat registrasi", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error saat registrasi", error: error.message });
   }
 };
 
-// ==========================================
-// 2. LOGIN MANUAL
-// ==========================================
+// login manual dan verifikasi kecocokan password bcrypt
 const loginManual = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -101,8 +103,13 @@ const loginManual = async (req, res) => {
       return res.status(404).json({ message: "Akun tidak ditemukan!" });
     }
 
-    if (user.auth_provider === 'google' && !user.password) {
-      return res.status(400).json({ message: "Akun ini terdaftar dengan Google. Silakan Login via Google." });
+    if (user.auth_provider === "google" && !user.password) {
+      return res
+        .status(400)
+        .json({
+          message:
+            "Akun ini terdaftar dengan Google. Silakan Login via Google.",
+        });
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -110,32 +117,30 @@ const loginManual = async (req, res) => {
       return res.status(401).json({ message: "Password salah!" });
     }
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email },
-      JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, {
+      expiresIn: "7d",
+    });
 
     res.status(200).json({
       message: "Login berhasil!",
       token,
-      user: { id: user.id, name: user.name, email: user.email }
+      user: { id: user.id, name: user.name, email: user.email },
     });
   } catch (error) {
     res.status(500).json({ message: "Error saat login", error: error.message });
   }
 };
 
-// ==========================================
-// 3. LOGOUT (BARU)
-// ==========================================
+// logout akun untuk instruksi penghapusan token di sisi klien
 const logout = async (req, res) => {
   try {
-    res.status(200).json({ 
-      message: "Logout berhasil! Silakan hapus token Anda dari aplikasi klien." 
+    res.status(200).json({
+      message: "Logout berhasil! Silakan hapus token Anda dari aplikasi klien.",
     });
   } catch (error) {
-    res.status(500).json({ message: "Error saat logout", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error saat logout", error: error.message });
   }
 };
 

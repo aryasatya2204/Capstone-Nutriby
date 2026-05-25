@@ -6,7 +6,7 @@ export default function FooterDashboard() {
           href="https://mail.google.com/mail/?view=cm&to=nutribyadmin@gmail.com"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-sm text-gray/80 hover:text-[#8B1E1E] transition-colors md:text-[12px]"
+          className="text-sm text-gray/80 hover:text-[#8B1E1E] transition-colors md:text-[14px]"
           aria-label="Email support"
         >
           ✉ nutribyadmin@gmail.com

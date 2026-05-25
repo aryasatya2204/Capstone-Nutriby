@@ -1,13 +1,18 @@
-const express = require('express');
-const { createChild, getChildren, updateChild } = require('../controllers/child.controller');
-const authMiddleware = require('../middlewares/auth.middleware');
+const express = require("express");
+const {
+  createChild,
+  getChildren,
+  updateChild,
+} = require("../controllers/child.controller");
+const authMiddleware = require("../middlewares/auth.middleware");
 
 const router = express.Router();
 
-router.use(authMiddleware); // Semua rute di file ini butuh login
+// semua rute wajib login dulu
+router.use(authMiddleware);
 
-router.post('/', createChild);
-router.get('/', getChildren); // Baris 9 sekarang sudah aman karena getChildren sudah dibuat
-router.put('/:id', updateChild);
+router.post("/", createChild);
+router.get("/", getChildren);
+router.put("/:id", updateChild);
 
 module.exports = router;

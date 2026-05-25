@@ -1,4 +1,4 @@
-import Logo from "../../assets/logo_nutriby.png"; // Pastikan path ini mengarah ke file logo Anda
+import Logo from "../../assets/logo_nutriby.png";
 
 function AuthModal({ onClose, onShowLogin, onShowRegister }) {
   return (
@@ -6,14 +6,13 @@ function AuthModal({ onClose, onShowLogin, onShowRegister }) {
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity"
       onClick={onClose}
     >
-      {/* Modal Box */}
+      {/* modal box */}
       <div
         className="relative flex w-full max-w-[400px] flex-col items-center rounded-[2.5rem] bg-[#8B2020] px-10 py-16 text-center shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header & Logo */}
+        {/* header logo */}
         <div className="mb-10 flex flex-col items-center">
-          {/* CLASS brightness-0 invert DIHAPUS DARI SINI */}
           <img
             src={Logo}
             alt="NutriBy Logo"
@@ -27,7 +26,7 @@ function AuthModal({ onClose, onShowLogin, onShowRegister }) {
           </p>
         </div>
 
-        {/* Buttons */}
+        {/* tombol aksi */}
         <div className="flex w-full flex-col gap-5">
           <button
             className="w-full rounded-full bg-white py-4 text-[18px] font-bold text-[#8B2020] transition-transform hover:scale-105 active:scale-95 shadow-md"

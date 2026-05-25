@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navigate, Outlet, useLocation } from "react-router-dom"; // <-- PERBAIKAN 1: Tambahkan useLocation di sini
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/authContext";
 
 export default function ProtectedRoute() {
@@ -10,8 +10,8 @@ export default function ProtectedRoute() {
   useEffect(() => {
     const checkChildData = async () => {
       const token = localStorage.getItem("token");
-      
-      // Jika sejak awal tidak ada token dan user, tidak perlu fetch ke backend
+
+      // jika tidak ada token dan user
       if (!user && !token) {
         setHasChild(false);
         return;
@@ -22,21 +22,17 @@ export default function ProtectedRoute() {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
-        // Cek apakah data array anak ada dan isinya lebih dari 0
+        // cek data anak
         setHasChild(data && data.length > 0);
       } catch (error) {
         setHasChild(false);
       }
     };
-    
+
     checkChildData();
   }, [user]);
 
-  // ==========================================
-  // AREA RETURN / PENGKONDISIAN (Boleh menggunakan return di sini)
-  // ==========================================
-  
-  // 1. Tunggu proses pengecekan selesai agar tidak salah lempar
+  // loading saat cek data anak
   if (hasChild === null) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#8B2020] text-white">
@@ -48,13 +44,13 @@ export default function ProtectedRoute() {
     );
   }
 
-  // 2. Cek apakah user benar-benar tidak login
+  // cek login user
   const token = localStorage.getItem("token");
   if (!user && !token) {
     return <Navigate to="/" replace />;
   }
 
-  // 3. JIKA BELUM PUNYA ANAK -> Tendang ke halaman utama dengan pesan error
+  // jika belum punya anak
   if (!hasChild) {
     return (
       <Navigate
@@ -69,6 +65,6 @@ export default function ProtectedRoute() {
     );
   }
 
-  // 4. Jika user sudah login DAN sudah punya anak -> Lolos ke Dashboard
+  // lolos ke dashboard
   return <Outlet />;
 }

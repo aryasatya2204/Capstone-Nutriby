@@ -3,7 +3,7 @@ import NavbarDashboard from "../../components/NavbarDashboard";
 import FooterDashboard from "../../components/FooterDashboard";
 import { useAuth } from "../../context/authContext";
 
-// --- DATA PREFERENSI PERTANYAAN (SUGGESTIONS) ---
+// DATA PREFERENSI PERTANYAAN (SUGGESTIONS)
 const SUGGESTIONS = {
   reguler: [
     "Berapa porsi dan tekstur makan ideal untuk usia 8 bulan?",
@@ -19,7 +19,7 @@ const SUGGESTIONS = {
   ],
 };
 
-// --- KOMPONEN TYPEWRITER EFEK MENGETIK ---
+// KOMPONEN TYPEWRITER EFEK MENGETIK
 const TypewriterText = ({ text, onTyping }) => {
   const [displayed, setDisplayed] = useState("");
 

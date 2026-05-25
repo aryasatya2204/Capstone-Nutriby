@@ -10,21 +10,20 @@ const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-// ==========================================
-// A. MEMBUAT SESI BARU
-// ==========================================
+// bikin sesi baru buat obrolan bot harian
 const createSession = async (req, res) => {
   try {
-    const { child_id, mode } = req.body; // mode: 'reguler' atau 'personal'
+    const { child_id, mode } = req.body;
     const userId = req.user.id;
 
-    // Pastikan anak tersebut adalah milik user yang sedang login
     const child = await prisma.child.findFirst({
-      where: { id: child_id, user_id: userId }
+      where: { id: child_id, user_id: userId },
     });
 
     if (!child) {
-      return res.status(403).json({ message: "Akses ditolak. Data profil tidak ditemukan." });
+      return res
+        .status(403)
+        .json({ message: "Akses ditolak. Data profil tidak ditemukan." });
     }
 
     const session = await prisma.botSession.create({
@@ -32,60 +31,66 @@ const createSession = async (req, res) => {
         child_id,
         mode,
         message_count: 0,
-        is_active: true
-      }
+        is_active: true,
+      },
     });
 
-    res.status(201).json({ message: "Sesi chatbot baru berhasil dibuat", session });
+    res
+      .status(201)
+      .json({ message: "Sesi chatbot baru berhasil dibuat", session });
   } catch (error) {
-    res.status(500).json({ message: "Gagal membuat sesi", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Gagal membuat sesi", error: error.message });
   }
 };
 
-// ==========================================
-// B. MENGIRIM PESAN & PROSES AI
-// ==========================================
+// proses kirim chat user ke gemini dan validasi limit kuota
 const sendMessage = async (req, res) => {
   try {
     const { session_id, message } = req.body;
-    const userId = req.user.id; // Asumsi ada middleware auth
+    const userId = req.user.id;
 
-    // 1. Ambil data sesi beserta profil anak (untuk validasi kepemilikan)
     const session = await prisma.botSession.findUnique({
       where: { id: session_id },
-      include: { child: true }
+      include: { child: true },
     });
 
     if (!session || session.child.user_id !== userId) {
-      return res.status(404).json({ message: "Sesi tidak ditemukan atau akses ditolak." });
+      return res
+        .status(404)
+        .json({ message: "Sesi tidak ditemukan atau akses ditolak." });
     }
 
-    // 2. Validasi Limit 5 Pertanyaan
     if (session.message_count >= 5 || !session.is_active) {
-      // Jika sudah limit, nonaktifkan sesi
       if (session.is_active) {
-         await prisma.botSession.update({ where: { id: session_id }, data: { is_active: false }});
+        await prisma.botSession.update({
+          where: { id: session_id },
+          data: { is_active: false },
+        });
       }
-      return res.status(403).json({ message: "Sesi ini telah mencapai batas 5 pertanyaan. Silakan buka sesi baru." });
+      return res
+        .status(403)
+        .json({
+          message:
+            "Sesi ini telah mencapai batas 5 pertanyaan. Silakan buka sesi baru.",
+        });
     }
 
-    // 3. Tentukan Judul Sesi (Jika ini pertanyaan pertama)
     let sessionTitle = session.title;
     if (session.message_count === 0) {
-      // Ambil 5 kata pertama sebagai judul (sederhana & tanpa cost API)
-      sessionTitle = message.split(' ').slice(0, 5).join(' ') + '...';
+      sessionTitle = message.split(" ").slice(0, 5).join(" ") + "...";
     }
 
-    // 4. Siapkan Data Personal (JIKA MODE PERSONAL)
     let childData = null;
-    if (session.mode === 'personal') {
+    if (session.mode === "personal") {
       const fullChildProfile = await prisma.child.findUnique({
         where: { id: session.child_id },
         include: {
-          growth_logs: { orderBy: { record_date: 'desc' }, take: 1 },
+          growth_logs: { orderBy: { record_date: "desc" }, take: 1 },
           allergies: { include: { allergy_category: true } },
-          preferences: { include: { ingredient: true } }
-        }
+          preferences: { include: { ingredient: true } },
+        },
       });
 
       if (fullChildProfile && fullChildProfile.growth_logs.length > 0) {
@@ -94,87 +99,103 @@ const sendMessage = async (req, res) => {
           gender: fullChildProfile.gender,
           ageInMonths: getAgeInMonths(fullChildProfile.dob),
           latestLog: fullChildProfile.growth_logs[0],
-          allergies: fullChildProfile.allergies.map(a => a.allergy_category.name),
-          preferences: fullChildProfile.preferences.map(p => p.ingredient.name)
+          allergies: fullChildProfile.allergies.map(
+            (a) => a.allergy_category.name,
+          ),
+          preferences: fullChildProfile.preferences.map(
+            (p) => p.ingredient.name,
+          ),
         };
       }
     }
 
-    // 5. Generate System Instruction & Ambil Histori
-    const systemInstruction = generateSystemInstruction(session.mode, childData);
+    const systemInstruction = generateSystemInstruction(
+      session.mode,
+      childData,
+    );
     const chatHistory = await prisma.botMessage.findMany({
       where: { session_id },
-      orderBy: { created_at: 'asc' }
+      orderBy: { created_at: "asc" },
     });
 
-    // 6. Simpan Pesan User & Update Sesi
     await prisma.$transaction([
       prisma.botMessage.create({
-        data: { session_id, sender: 'user', message }
+        data: { session_id, sender: "user", message },
       }),
       prisma.botSession.update({
         where: { id: session_id },
-        data: { 
-          title: sessionTitle, 
-          message_count: { increment: 1 } 
-        }
-      })
+        data: {
+          title: sessionTitle,
+          message_count: { increment: 1 },
+        },
+      }),
     ]);
 
-    // 7. Panggil API Gemini
-    const aiResponse = await generateChatResponse(systemInstruction, chatHistory, message);
+    const aiResponse = await generateChatResponse(
+      systemInstruction,
+      chatHistory,
+      message,
+    );
 
-    // 8. Simpan Balasan Bot
     const savedBotMessage = await prisma.botMessage.create({
-      data: { session_id, sender: 'bot', message: aiResponse }
+      data: { session_id, sender: "bot", message: aiResponse },
     });
 
-    res.status(200).json({ 
-      reply: savedBotMessage.message, 
-      remaining_questions: 5 - (session.message_count + 1)
+    res.status(200).json({
+      reply: savedBotMessage.message,
+      remaining_questions: 5 - (session.message_count + 1),
     });
-
   } catch (error) {
     console.error("Chatbot Error:", error);
-    res.status(500).json({ message: "Gagal memproses pesan", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Gagal memproses pesan", error: error.message });
   }
 };
 
-// ==========================================
-// C. MENGAMBIL RIWAYAT SESI
-// ==========================================
+// ambil semua riwayat daftar obrolan konsultasi anak
 const getSessions = async (req, res) => {
   try {
     const { child_id } = req.params;
     const sessions = await prisma.botSession.findMany({
       where: { child_id },
-      orderBy: { created_at: 'desc' },
+      orderBy: { created_at: "desc" },
       select: {
         id: true,
         title: true,
         mode: true,
         is_active: true,
         message_count: true,
-        created_at: true
-      }
+        created_at: true,
+      },
     });
     res.status(200).json(sessions);
   } catch (error) {
-    res.status(500).json({ message: "Gagal mengambil riwayat", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Gagal mengambil riwayat", error: error.message });
   }
 };
 
+// tarik isi teks chat lengkap di dalam satu sesi
 const getSessionMessages = async (req, res) => {
   try {
     const { session_id } = req.params;
     const messages = await prisma.botMessage.findMany({
       where: { session_id },
-      orderBy: { created_at: 'asc' }
+      orderBy: { created_at: "asc" },
     });
     res.status(200).json(messages);
   } catch (error) {
-    res.status(500).json({ message: "Gagal memuat pesan", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Gagal memuat pesan", error: error.message });
   }
 };
 
-module.exports = { createSession, sendMessage, getSessions, getSessionMessages };
+module.exports = {
+  createSession,
+  sendMessage,
+  getSessions,
+  getSessionMessages,
+};

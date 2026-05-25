@@ -61,7 +61,7 @@ export default function SearchMenu() {
   const [isSearching, setIsSearching] = useState(false);
 
   const [selectedAllergies, setSelectedAllergies] = useState([]);
-  const [selectedPreferences, setSelectedPreferences] = useState([]); 
+  const [selectedPreferences, setSelectedPreferences] = useState([]);
   const [searchIngredients, setSearchIngredients] = useState([]);
   const [budgetInput, setBudgetInput] = useState("");
 
@@ -398,7 +398,6 @@ export default function SearchMenu() {
                     <span className="text-sm font-bold text-gray-400">
                       Pilih favorit...
                     </span>
-                  
                   )}
                 </div>
                 {openDropdown === "preference" && (
@@ -555,7 +554,7 @@ export default function SearchMenu() {
             </div>
           </div>
 
-          {/* ═══ PANEL KANAN: HASIL REKOMENDASI ════════════════════════════════ */}
+          {/*PANEL KANAN: HASIL REKOMENDASI */}
           <div className="lg:col-span-8">
             <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 min-h-[600px]">
               <div className="flex justify-between items-center border-b border-gray-100 pb-5 mb-6">

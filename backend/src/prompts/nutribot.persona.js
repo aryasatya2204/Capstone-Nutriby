@@ -1,8 +1,8 @@
 /**
- * Menghasilkan System Instruction untuk Gemini API
+ * menghasilkan system instruction untuk gemini api
  * @param {string} mode - 'reguler' atau 'personal'
- * @param {object|null} childData - Data anak beserta log pertumbuhan, alergi, dan preferensi
- * @returns {string} String prompt instruksi sistem
+ * @param {object|null} childData - data anak beserta log pertumbuhan, alergi, dan preferensi
+ * @returns {string} string prompt instruksi sistem
  */
 const generateSystemInstruction = (mode, childData = null) => {
   let basePersona = `
@@ -17,18 +17,19 @@ ATURAN MUTLAK (GUARDRAILS):
 Jangan gunakan emoji, simbol atau format markdown. 
 `;
 
-  if (mode === 'personal' && childData) {
+  // jika pakai mode personal dan ada data anak
+  if (mode === "personal" && childData) {
     basePersona += `
 \nMODE PERSONAL AKTIF:
 Anda memiliki akses ke data klinis dan preferensi anak pengguna berikut ini:
 - Nama Anak: ${childData.name}
 - Umur: ${childData.ageInMonths} bulan
-- Jenis Kelamin: ${childData.gender === 'L' ? 'Laki-laki' : 'Perempuan'}
+- Jenis Kelamin: ${childData.gender === "L" ? "Laki-laki" : "Perempuan"}
 - Berat Badan Terakhir: ${childData.latestLog.berat} kg (Z-Score WFA: ${childData.latestLog.zscore_wfa}, Status: ${childData.latestLog.status_wfa})
 - Tinggi Badan Terakhir: ${childData.latestLog.tinggi} cm (Z-Score HFA: ${childData.latestLog.zscore_hfa}, Status: ${childData.latestLog.status_hfa})
 - Target Kalori Harian: ${childData.latestLog.target_kalori} kkal
-- Alergi: ${childData.allergies.length > 0 ? childData.allergies.join(', ') : 'Tidak ada catatan alergi'}
-- Makanan Kesukaan: ${childData.preferences.length > 0 ? childData.preferences.join(', ') : 'Belum diatur'}
+- Alergi: ${childData.allergies.length > 0 ? childData.allergies.join(", ") : "Tidak ada catatan alergi"}
+- Makanan Kesukaan: ${childData.preferences.length > 0 ? childData.preferences.join(", ") : "Belum diatur"}
 
 Gunakan data di atas untuk mempersonalisasi setiap jawaban Anda. Jika menyarankan makanan, pastikan menghindari bahan alergi anak tersebut. Jika membahas pertumbuhan, kaitkan dengan status Z-score mereka saat ini.
 `;

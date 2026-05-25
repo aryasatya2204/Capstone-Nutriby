@@ -51,7 +51,9 @@ function RegisterStep1({ onClose, onShowLogin, onNext }) {
 
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
     if (!passwordRegex.test(form.password)) {
-      setError("Password minimal 8 karakter, mengandung minimal 1 huruf besar dan 1 angka.");
+      setError(
+        "Password minimal 8 karakter, mengandung minimal 1 huruf besar dan 1 angka.",
+      );
       return;
     }
 
@@ -94,7 +96,8 @@ function RegisterStep1({ onClose, onShowLogin, onNext }) {
     setIsLoading(true);
     setError("");
     try {
-      const res = await fetch("http://localhost:3000/api/auth/google", { // fix: https → http
+      const res = await fetch("http://localhost:3000/api/auth/google", {
+        // fix: https → http
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken: credentialResponse.credential }),
@@ -162,12 +165,12 @@ function RegisterStep1({ onClose, onShowLogin, onNext }) {
                 Username
               </label>
               <input
-  type="text"
-  name="username"
-  value={form.username}
-  onChange={handleChange}
-  className="rounded-lg border-b-2 border-white bg-transparent px-2 py-2 text-white outline-none focus:border-gray-300"
-/>
+                type="text"
+                name="username"
+                value={form.username}
+                onChange={handleChange}
+                className="rounded-lg border-b-2 border-white bg-transparent px-2 py-2 text-white outline-none focus:border-gray-300"
+              />
             </div>
 
             {/* EMAIL */}
@@ -214,9 +217,10 @@ function RegisterStep1({ onClose, onShowLogin, onNext }) {
             disabled={isLoading || !isFormValid}
             title={!isFormValid ? "Lengkapi semua field dengan benar" : ""}
             className={`mt-8 w-full rounded-full py-4 text-[16px] font-bold transition-all
-              ${isFormValid && !isLoading
-                ? "bg-white text-[#8B2020] hover:bg-gray-100 cursor-pointer"
-                : "bg-white/40 text-white/60 cursor-not-allowed"
+              ${
+                isFormValid && !isLoading
+                  ? "bg-white text-[#8B2020] hover:bg-gray-100 cursor-pointer"
+                  : "bg-white/40 text-white/60 cursor-not-allowed"
               }`}
           >
             {isLoading ? "Memproses..." : "Daftar"}
@@ -225,7 +229,9 @@ function RegisterStep1({ onClose, onShowLogin, onNext }) {
           {/* Divider */}
           <div className="my-7 flex items-center justify-center gap-4">
             <div className="h-px w-20 bg-white/60"></div>
-            <span className="text-[15px] text-white/90 italic">Atau daftar dengan</span>
+            <span className="text-[15px] text-white/90 italic">
+              Atau daftar dengan
+            </span>
             <div className="h-px w-20 bg-white/60"></div>
           </div>
 

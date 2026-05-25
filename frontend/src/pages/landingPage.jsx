@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom"; // <--- PERBAIKAN IMPORT
+import { useLocation } from "react-router-dom";
 import Navbar from "../components/navbar";
 import Footer from "../components/footer";
 import heroImage from "../assets/header_fotoIbuAnak.jpeg";
@@ -8,7 +8,6 @@ import LoginForm from "./authentication/loginForm";
 import RegisterStep1 from "./authentication/registerStep1";
 import ChildRegistration from "./ChildRegistration";
 
-// ... (Import gambar fitur & steps tetap sama) ...
 import fitur1Img from "../assets/landingPage/fitur1Img.jpeg";
 import fitur2Img from "../assets/landingPage/fitur2Img.jpeg";
 import fitur3Img from "../assets/landingPage/fitur3Img.jpeg";
@@ -70,7 +69,7 @@ function LandingPage() {
   const [guardError, setGuardError] = useState("");
 
   useEffect(() => {
-    // Handler scroll dari Navbar (dipanggil dari halaman lain)
+    // buat otomatis scroll ke bagian tertentu pas di-klik dari navbar halaman lain
     if (location.state?.scrollTo) {
       const id = location.state.scrollTo;
       setTimeout(() => {
@@ -84,7 +83,7 @@ function LandingPage() {
       }, 100);
     }
 
-    // Handler tolakan dari ProtectedRoute/Dashboard
+    // buat maksa buka modal daftar anak kalau user ditolak pas mau masuk dashboard
     if (location.state?.fromGuard) {
       setTimeout(() => {
         setGuardError(location.state.message);
@@ -92,7 +91,7 @@ function LandingPage() {
       }, 0);
     }
 
-    // Bersihkan state URL agar tidak looping
+    // hapus data state di url browser biar gak mentok atau looping terus pas di-refresh
     if (location.state?.scrollTo || location.state?.fromGuard) {
       window.history.replaceState({}, document.title);
     }
@@ -104,7 +103,6 @@ function LandingPage() {
     <div className="min-h-screen bg-[#F3EFEA] font-['Lato']">
       <Navbar onLoginClick={() => setModal("auth")} />
 
-      {/* ── HERO SECTION ── */}
       <section className="mx-auto mt-5 max-w-6xl px-4 md:px-6">
         <div
           className="relative flex min-h-[340px] items-center overflow-hidden rounded-[1.5rem] bg-cover bg-top px-6 shadow-sm md:min-h-[420px] md:rounded-[2rem] md:px-16"
@@ -130,7 +128,7 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* ── TANTANGAN SECTION ── */}
+      {/* bagian isi tantangan orang tua */}
       <section className="mt-12 md:mt-16">
         <h2 className="mb-6 px-4 text-center text-[16px] font-bold text-[#8B1E1E] md:mb-8 md:px-6 md:text-[18px]">
           Tantangan yang sering dihadapi orang tua
@@ -165,7 +163,7 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* ── CARA KERJA (STEPS) SECTION ── */}
+      {/* bagian section alur atau cara kerja aplikasi */}
       <section
         id="cara-kerja"
         className="mx-auto mt-10 max-w-5xl px-4 md:mt-12 md:px-6"
@@ -195,7 +193,7 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* ── FITUR SECTION ── */}
+      {/* bagian section daftar fitur nutriBy */}
       <section
         id="fitur"
         className="mx-auto mt-16 max-w-[700px] px-4 md:mt-20 md:px-6"
@@ -225,7 +223,7 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* ── ABOUT SECTION ── */}
+      {/* bagian section tentang penjelasan singkat platform */}
       <section
         id="tentang"
         className="mx-auto mt-16 max-w-4xl px-4 md:mt-24 md:px-6"
@@ -251,7 +249,6 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* ── CALL TO ACTION ── */}
       <section className="my-16 px-4 text-center md:my-24 md:px-6">
         <h2 className="mx-auto mb-3 max-w-[600px] text-[22px] font-bold leading-snug text-[#8B1E1E] md:mb-4 md:text-[28px]">
           Mulai Langkah Terbaik untuk Tumbuh Kembang Anak Anda
@@ -269,7 +266,6 @@ function LandingPage() {
 
       <Footer />
 
-      {/* MODALS */}
       {modal === "auth" && (
         <AuthModal
           onClose={closeModal}
@@ -284,8 +280,6 @@ function LandingPage() {
           onShowAuth={() => setModal("auth")}
         />
       )}
-
-      {/* === PERBAIKAN: Ubah onNext agar mengubah modal ke childReg === */}
       {modal === "reg1" && (
         <RegisterStep1
           onNext={() => setModal("childReg")}
@@ -293,8 +287,6 @@ function LandingPage() {
           onShowLogin={() => setModal("login")}
         />
       )}
-
-      {/* === PERBAIKAN: Kirimkan guardError ke dalam komponen ChildRegistration === */}
       {modal === "childReg" && (
         <ChildRegistration forcedError={guardError} onClose={closeModal} />
       )}

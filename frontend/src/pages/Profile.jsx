@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 
 const API_BASE = "http://localhost:3000/api";
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
+// fungsi buat hitung umur otomatis dari tgl lahir biar jd teks singkat kayak 5 bln atau 2thn
 const getAgeLabel = (dob) => {
   if (!dob) return "";
   const months = Math.floor(
@@ -19,11 +19,13 @@ const getAgeLabel = (dob) => {
   return m > 0 ? `${y}thn ${m}bln` : `${y} thn`;
 };
 
+// fungsi buat ngambil data perkembangan anak yang paling baru
 const getLatestLog = (child) => {
   const logs = child.growth_logs || [];
   return logs.length > 0 ? logs[0] : null;
 };
 
+// fungsi buat nentuin warna status gizi anak (hijau baik, kuning kurang, merah buruk)
 const getStatusStyle = (status) => {
   const s = (status || "").toLowerCase();
   if (s.includes("baik") || s.includes("normal"))
@@ -36,10 +38,12 @@ const getStatusStyle = (status) => {
 };
 
 const getInitial = (name) => (name ? name[0].toUpperCase() : "?");
+
 const GENDER_LABEL = { L: "Laki-laki", P: "Perempuan" };
+
 const AVATAR_COLORS = ["#8B2020", "#1a6b8a", "#7b4ea0", "#d35400", "#1e7a50"];
 
-// ─── ICONS ───────────────────────────────────────────────────────────────────
+// KUMPULAN ICON UNTUK PROFILE
 const IconX = () => (
   <svg
     width="14"
@@ -159,7 +163,9 @@ const IconCheck = () => (
     <polyline points="20 6 9 17 4 12" />
   </svg>
 );
-// ─── MODAL: KONFIRMASI LOGOUT ─────────────────────────────────────────────────
+
+//LOGOUT
+//pop up konfirmasi logout
 function LogoutConfirmModal({ onCancel, onConfirm }) {
   return (
     <div
@@ -206,7 +212,7 @@ function LogoutConfirmModal({ onCancel, onConfirm }) {
   );
 }
 
-// ─── SECTION: PROFIL SI KECIL (accordion di header) ─────────────────────────
+//profile si kecil
 function ChildSection({ children_list, activeChild, onSelect, onAdd }) {
   const [open, setOpen] = useState(false);
 
@@ -218,7 +224,6 @@ function ChildSection({ children_list, activeChild, onSelect, onAdd }) {
         boxShadow: "0 1px 6px rgba(0,0,0,0.05)",
       }}
     >
-      {/* Header — bisa diklik untuk expand/collapse */}
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between px-5 py-3.5 transition-colors"
@@ -252,11 +257,9 @@ function ChildSection({ children_list, activeChild, onSelect, onAdd }) {
         </div>
       </button>
 
-      {/* Expanded content */}
       {open && (
         <div style={{ animation: "dropIn 0.15s ease forwards" }}>
           {children_list.length === 0 ? (
-            /* Belum ada anak */
             <div
               className="mx-4 my-4 text-center py-8 rounded-xl"
               style={{ background: "#FDFBF9", border: "2px dashed #EDE9E3" }}
@@ -294,7 +297,6 @@ function ChildSection({ children_list, activeChild, onSelect, onAdd }) {
                     (e.currentTarget.style.background = "transparent")
                   }
                 >
-                  {/* Avatar */}
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-base flex-shrink-0"
                     style={{ background: cColor }}
@@ -302,7 +304,7 @@ function ChildSection({ children_list, activeChild, onSelect, onAdd }) {
                     {getInitial(child.name)}
                   </div>
 
-                  {/* Info */}
+                  {/* data si anak */}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-gray-900 truncate leading-tight">
                       {child.name}
@@ -329,7 +331,7 @@ function ChildSection({ children_list, activeChild, onSelect, onAdd }) {
                     )}
                   </div>
 
-                  {/* Keterangan aktif */}
+                  {/* status profilenya aktif atau tidak */}
                   {isActive ? (
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       <div
@@ -351,7 +353,7 @@ function ChildSection({ children_list, activeChild, onSelect, onAdd }) {
             })
           )}
 
-          {/* Baris Tambah Akun */}
+          {/* buat nambah profil baru */}
           <button
             onClick={onAdd}
             className="w-full flex items-center gap-3 px-5 py-3.5 transition-colors"
@@ -380,7 +382,7 @@ function ChildSection({ children_list, activeChild, onSelect, onAdd }) {
   );
 }
 
-// ─── MAIN PROFILE ─────────────────────────────────────────────────────────────
+// halaman utama profil
 export default function Profile() {
   const {
     user,
@@ -392,6 +394,7 @@ export default function Profile() {
   } = useAuth();
   const navigate = useNavigate();
 
+  // state buat backup data user dari local storage browser kalo di context kosong
   const [localUser, setLocalUser] = useState(() => {
     try {
       const s = localStorage.getItem("user");
@@ -402,11 +405,13 @@ export default function Profile() {
   });
   const displayUser = user || localUser;
 
+  // kumpulan state
   const [showChildModal, setShowChildModal] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const [switchingName, setSwitchingName] = useState("");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
+  // fungsi pas user klik ganti profil anak yang mau dipantau
   const handleSelectChild = (childId) => {
     if (childId === activeChild?.id) return;
     const child = children_list.find((c) => c.id === childId);
@@ -423,11 +428,11 @@ export default function Profile() {
       className="flex min-h-screen flex-col"
       style={{
         background: "#F5F0EB",
-        fontFamily: "'Plus Jakarta Sans', sans-serif",
+        ffontFamily: "'Lato', sans-serif",
       }}
     >
+      {/* css internal khusus buat animasi transisi pas web dibuka */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(10px); }
           to   { opacity: 1; transform: translateY(0); }
@@ -447,8 +452,8 @@ export default function Profile() {
 
       <NavbarDashboard />
 
+      {/* navigasi kecil */}
       <main className="flex-1 w-full max-w-lg mx-auto px-4 pt-5 pb-12">
-        {/* ── BREADCRUMB ── */}
         <div
           className="flex items-center gap-1.5 text-xs text-gray-400 mb-5 font-medium"
           style={{ animation: "fadeUp 0.25s ease both" }}
@@ -465,7 +470,7 @@ export default function Profile() {
           </span>
         </div>
 
-        {/* ── SECTION: INFORMASI AKUN ── */}
+        {/*informasi akun org tua*/}
         <div
           className="fade-up-1 bg-white rounded-2xl mb-4 overflow-hidden"
           style={{
@@ -473,7 +478,6 @@ export default function Profile() {
             boxShadow: "0 1px 6px rgba(0,0,0,0.05)",
           }}
         >
-          {/* Section header */}
           <div
             className="flex items-center justify-between px-5 py-3.5 border-b"
             style={{ borderColor: "#F0EBE5" }}
@@ -496,7 +500,7 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Avatar + info */}
+          {/* detail data user*/}
           <div className="flex items-center gap-4 px-5 py-4">
             <div className="relative flex-shrink-0">
               <div
@@ -542,7 +546,6 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* ── SECTION: PROFIL SI KECIL ── */}
         <ChildSection
           children_list={children_list}
           activeChild={activeChild}
@@ -550,7 +553,6 @@ export default function Profile() {
           onAdd={() => setShowChildModal(true)}
         />
 
-        {/* ── LOGOUT ── */}
         <div className="fade-up-3">
           <button
             onClick={() => setShowLogoutConfirm(true)}
@@ -569,7 +571,7 @@ export default function Profile() {
 
       <FooterDashboard />
 
-      {/* ── MODAL: TAMBAH ANAK ── */}
+      {/* modal pop up buat ngisi form pendaftaran anak baru */}
       {showChildModal && (
         <ChildRegistration
           onClose={() => {
@@ -579,7 +581,7 @@ export default function Profile() {
         />
       )}
 
-      {/* ── MODAL: BERALIH AKUN ── */}
+      {/* loading screen spinner pas sistem lagi proses beralih akun anak */}
       {isSwitching && (
         <div
           className="fixed inset-0 z-[700] flex items-center justify-center"
@@ -600,7 +602,7 @@ export default function Profile() {
         </div>
       )}
 
-      {/* ── MODAL: KONFIRMASI LOGOUT ── */}
+      {/* memanggil modal konfirmasi pas user beneran klik logout */}
       {showLogoutConfirm && (
         <LogoutConfirmModal
           onCancel={() => setShowLogoutConfirm(false)}

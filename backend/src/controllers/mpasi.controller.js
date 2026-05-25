@@ -10,6 +10,7 @@ const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
+// ambil resep lolos filter gizi dan alergi dari model ml
 const getScoredRecipesFromML = async (childId, mlDailyBudget) => {
   const child = await prisma.child.findUnique({
     where: { id: childId },
@@ -72,6 +73,7 @@ const getScoredRecipesFromML = async (childId, mlDailyBudget) => {
   return { child, approvedRecipes };
 };
 
+// bikin rekomendasi menu tunggal acak pas budget
 const generateSingleMenu = async (req, res) => {
   try {
     const { childId } = req.params;
@@ -98,19 +100,15 @@ const generateSingleMenu = async (req, res) => {
     );
 
     if (filteredRecipes.length === 0)
-      return res
-        .status(404)
-        .json({
-          message: `Maaf, tidak ada resep standar AI yang masuk budget maksimal Rp ${Math.round(budgetPerMenu)}/porsi.`,
-        });
-
-    res
-      .status(200)
-      .json({
-        message: `Berhasil mendapatkan ${filteredRecipes.length} rekomendasi menu!`,
-        budget_per_menu_applied: budgetPerMenu,
-        data: filteredRecipes,
+      return res.status(404).json({
+        message: `Maaf, tidak ada resep standar AI yang masuk budget maksimal Rp ${Math.round(budgetPerMenu)}/porsi.`,
       });
+
+    res.status(200).json({
+      message: `Berhasil mendapatkan ${filteredRecipes.length} rekomendasi menu!`,
+      budget_per_menu_applied: budgetPerMenu,
+      data: filteredRecipes,
+    });
   } catch (error) {
     res
       .status(500)
@@ -118,6 +116,7 @@ const generateSingleMenu = async (req, res) => {
   }
 };
 
+// susun rencana jadwal makan mingguan (21 porsi)
 const generateWeeklyPlan = async (req, res) => {
   try {
     const { childId } = req.params;
@@ -171,11 +170,9 @@ const generateWeeklyPlan = async (req, res) => {
     const minPossibleCost = parseFloat(cheapestRecipe.est_price) * 21;
 
     if (weeklyBudgetLimit < minPossibleCost)
-      return res
-        .status(400)
-        .json({
-          message: `Maaf, budget terlalu rendah. Minimal budget untuk 21 porsi resep termurah adalah Rp ${minPossibleCost}.`,
-        });
+      return res.status(400).json({
+        message: `Maaf, budget terlalu rendah. Minimal budget untuk 21 porsi resep termurah adalah Rp ${minPossibleCost}.`,
+      });
 
     let actualTotalCost = 0;
     const mealPlanItems = [];
@@ -226,12 +223,10 @@ const generateWeeklyPlan = async (req, res) => {
       },
     });
 
-    res
-      .status(201)
-      .json({
-        message: "Jadwal MPASI Mingguan berhasil disusun!",
-        data: savedPlan,
-      });
+    res.status(201).json({
+      message: "Jadwal MPASI Mingguan berhasil disusun!",
+      data: savedPlan,
+    });
   } catch (error) {
     res
       .status(500)
@@ -242,54 +237,60 @@ const generateWeeklyPlan = async (req, res) => {
   }
 };
 
+// cari menu berdasarkan kecocokan bahan masakan (logika or)
 const searchMenuByIngredient = async (req, res) => {
   try {
     const { childId } = req.params;
-    const { custom_budget, ingredients } = req.body; 
-    // ingredients = array nama bahan untuk pencarian, misal: ["Ayam", "Wortel"]
+    const { custom_budget, ingredients } = req.body;
 
-    const childBase = await prisma.child.findUnique({ 
+    const childBase = await prisma.child.findUnique({
       where: { id: childId },
       include: {
-        meal_plans: { where: { plan_type: "Bulanan" }, orderBy: { id: "desc" }, take: 1 }
-      }
+        meal_plans: {
+          where: { plan_type: "Bulanan" },
+          orderBy: { id: "desc" },
+          take: 1,
+        },
+      },
     });
-    
-    if (!childBase) return res.status(404).json({ message: "Data anak tidak ditemukan." });
 
-    // 1. Ambil Budget Per Porsi (Jika tidak di-custom, ambil dari aktual bulanan / 90)
+    if (!childBase)
+      return res.status(404).json({ message: "Data anak tidak ditemukan." });
+
     let budgetPerMenu;
     if (custom_budget !== undefined && custom_budget !== null) {
       budgetPerMenu = parseFloat(custom_budget);
     } else {
       const activeBulanan = childBase.meal_plans[0];
-      const rawBudget = activeBulanan?.actual_total_cost 
-        ? parseFloat(activeBulanan.actual_total_cost) / 90 
+      const rawBudget = activeBulanan?.actual_total_cost
+        ? parseFloat(activeBulanan.actual_total_cost) / 90
         : parseFloat(childBase.optimal_budget_cache) / 30 / 3;
-      
-      // Pembulatan ke ratusan terdekat (misal 8333 -> 8300)
+
       budgetPerMenu = Math.round(rawBudget / 100) * 100;
     }
-    
-    // 2. Tarik Rekomendasi ML (Model AI akan memproses Alergi & Kesukaan dari DB otomatis)
+
     const mlDailyBudget = budgetPerMenu * 3;
-    const { approvedRecipes } = await getScoredRecipesFromML(childId, mlDailyBudget);
+    const { approvedRecipes } = await getScoredRecipesFromML(
+      childId,
+      mlDailyBudget,
+    );
 
-    // 3. Filter berdasarkan harga maksimal per porsi
-    let filteredRecipes = approvedRecipes.filter(r => parseFloat(r.est_price) <= budgetPerMenu);
+    let filteredRecipes = approvedRecipes.filter(
+      (r) => parseFloat(r.est_price) <= budgetPerMenu,
+    );
 
-    // 4. LOGIKA OR: Filter murni berdasarkan bahan masakan yang dicari
     if (ingredients && Array.isArray(ingredients) && ingredients.length > 0) {
-      const keywords = ingredients.map(i => i.toLowerCase());
-      filteredRecipes = filteredRecipes.filter(r => {
+      const keywords = ingredients.map((i) => i.toLowerCase());
+      filteredRecipes = filteredRecipes.filter((r) => {
         const bahanLower = r.bahan_masakan.toLowerCase();
         const nameLower = r.name.toLowerCase();
-        // Return true jika minimal ada 1 bahan yang cocok (Logika OR)
-        return keywords.some(keyword => bahanLower.includes(keyword) || nameLower.includes(keyword));
+        return keywords.some(
+          (keyword) =>
+            bahanLower.includes(keyword) || nameLower.includes(keyword),
+        );
       });
     }
 
-    // 5. Simpan ke Cache agar tidak hilang saat direfresh
     await prisma.child.update({
       where: { id: childId },
       data: { last_search_cache: filteredRecipes },
@@ -301,10 +302,13 @@ const searchMenuByIngredient = async (req, res) => {
       data: filteredRecipes,
     });
   } catch (error) {
-    res.status(500).json({ message: "Gagal mencari menu", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Gagal mencari menu", error: error.message });
   }
 };
 
+// hapus seluruh perencanaan mingguan aktif
 const deleteWeeklyPlan = async (req, res) => {
   try {
     const { childId } = req.params;
@@ -319,6 +323,7 @@ const deleteWeeklyPlan = async (req, res) => {
   }
 };
 
+// cari 5 alternatif menu pengganti yang muat di sisa budget
 const getAlternativeRecipes = async (req, res) => {
   try {
     const { childId, mealPlanItemId } = req.params;
@@ -350,13 +355,11 @@ const getAlternativeRecipes = async (req, res) => {
         parseFloat(r.est_price) <= availableBudgetForThisMeal &&
         !existingRecipeIds.includes(r.id),
     );
-    res
-      .status(200)
-      .json({
-        message: "Berhasil mendapatkan alternatif menu",
-        available_budget: availableBudgetForThisMeal,
-        data: alternativeCandidates.slice(0, 5),
-      });
+    res.status(200).json({
+      message: "Berhasil mendapatkan alternatif menu",
+      available_budget: availableBudgetForThisMeal,
+      data: alternativeCandidates.slice(0, 5),
+    });
   } catch (error) {
     res
       .status(500)
@@ -364,6 +367,7 @@ const getAlternativeRecipes = async (req, res) => {
   }
 };
 
+// tukar menu aktif dengan resep alternatif pilihan user
 const swapMealPlanItem = async (req, res) => {
   try {
     const { mealPlanItemId } = req.params;

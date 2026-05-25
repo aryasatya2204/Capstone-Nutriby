@@ -26,7 +26,7 @@ export function AuthProvider({ children }) {
   const [children_list, setChildrenList] = useState([]);
   const [activeChild, setActiveChildState] = useState(null);
 
-  // ── FETCH SEMUA ANAK ──────────────────────────────────────────────────────
+  // ambil data semua anak
   const fetchChildren = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -39,7 +39,7 @@ export function AuthProvider({ children }) {
       const list = Array.isArray(data) ? data : [];
       setChildrenList(list);
 
-      // Tentukan activeChild: pakai savedId kalau masih valid, fallback ke index 0
+      // set anak yang aktif
       const savedId = localStorage.getItem("activeChildId");
       const found = list.find((c) => c.id === savedId);
       const active = found || list[0] || null;
@@ -50,7 +50,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Fetch saat user login
+  // ambil data anak pas login
   useEffect(() => {
     if (user) fetchChildren();
     else {
@@ -59,7 +59,7 @@ export function AuthProvider({ children }) {
     }
   }, [user, fetchChildren]);
 
-  // ── SWITCH ANAK AKTIF ─────────────────────────────────────────────────────
+  // ganti anak yang aktif
   const setActiveChild = useCallback(
     (childId) => {
       const found = children_list.find((c) => c.id === childId);
@@ -70,7 +70,7 @@ export function AuthProvider({ children }) {
     [children_list],
   );
 
-  // ── AUTH ──────────────────────────────────────────────────────────────────
+  // fungsi auth login logout
   const login = (userData) => {
     setUser(userData);
   };
@@ -90,10 +90,10 @@ export function AuthProvider({ children }) {
         user,
         login,
         logout,
-        activeChild, // objek anak yang aktif — langsung pakai ini
-        setActiveChild, // fungsi switch: setActiveChild(childId)
-        children_list, // semua anak milik user
-        fetchChildren, // panggil setelah tambah anak baru
+        activeChild,
+        setActiveChild,
+        children_list,
+        fetchChildren,
       }}
     >
       {children}

@@ -11,13 +11,14 @@ const prisma = new PrismaClient({ adapter });
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Helper untuk memastikan tanggal selalu di format YYYY-MM-DD sesuai zona waktu WIB
+// format tanggal jadi YYYY-MM-DD waktu wib
 const getWIBDateString = (dateObj) => {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Jakarta",
-  }).format(dateObj); // Output pasti: "YYYY-MM-DD"
+  }).format(dateObj);
 };
 
+// ambil tips gizi harian anak pakai ai
 const getDailyInsight = async (req, res) => {
   try {
     const { childId } = req.params;
@@ -30,13 +31,12 @@ const getDailyInsight = async (req, res) => {
     if (!child)
       return res.status(404).json({ message: "Data anak tidak ditemukan." });
 
-    // Format tanggal hari ini 100% akurat di WIB
     const todayString = getWIBDateString(new Date());
     const lastInsightString = child.last_insight_date
       ? getWIBDateString(new Date(child.last_insight_date))
       : null;
 
-    // LOGIKA CACHING: Gemini hanya terpanggil jika ini adalah hari baru di Indonesia
+    // cek cache biar gemini gak kepanggil dua kali sehari
     if (lastInsightString === todayString && child.daily_insight_text) {
       return res.status(200).json({ insight: child.daily_insight_text });
     }
@@ -49,7 +49,7 @@ const getDailyInsight = async (req, res) => {
       ? parseFloat(child.optimal_budget_cache)
       : 0;
 
-   const prompt = `
+    const prompt = `
       Bertindaklah sebagai Ahli Gizi Anak yang sangat empatik.
       Data Anak: Nama ${child.name}, Usia ${ageMonths} bulan, Status Gizi: ${statusGizi}.
 
@@ -61,12 +61,12 @@ const getDailyInsight = async (req, res) => {
     const result = await model.generateContent(prompt);
     const newInsight = result.response.text().trim();
 
-    // Simpan insight dan update tanggal agar tidak di-hit lagi hari ini
+    // simpan tips baru dan tandai tanggal hari ini
     await prisma.child.update({
       where: { id: childId },
       data: {
         daily_insight_text: newInsight,
-        last_insight_date: new Date(), // Simpan timestamp saat ini
+        last_insight_date: new Date(),
       },
     });
 

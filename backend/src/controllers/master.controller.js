@@ -7,6 +7,7 @@ const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
+// ambil semua kategori alergi dan item di dalamnya
 const getAllergies = async (req, res) => {
   try {
     const allergies = await prisma.allergyCategory.findMany({
@@ -21,6 +22,7 @@ const getAllergies = async (req, res) => {
   }
 };
 
+// ambil semua master data bahan makanan
 const getIngredients = async (req, res) => {
   try {
     const ingredients = await prisma.ingredient.findMany({
@@ -28,12 +30,10 @@ const getIngredients = async (req, res) => {
     });
     res.status(200).json(ingredients);
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        message: "Gagal mengambil data bahan makanan",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Gagal mengambil data bahan makanan",
+      error: error.message,
+    });
   }
 };
 

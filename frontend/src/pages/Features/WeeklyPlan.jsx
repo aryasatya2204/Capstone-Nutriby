@@ -7,6 +7,7 @@ import RecipeDetailPopup from "./RecipeDetailPopup";
 import PrintableWeeklyPlan from "./PrintableWeeklyPlan";
 import { useAuth } from "../../context/authContext";
 
+//konfigurasi
 const API_BASE = "http://localhost:3000/api";
 const BASE_HARI = [
   "Minggu",
@@ -18,6 +19,7 @@ const BASE_HARI = [
   "Sabtu",
 ];
 
+//FUNGSI HELPERR
 const formatRupiah = (angka) =>
   new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -59,6 +61,7 @@ const calculateDayOffset = (createdAt) => {
   return Math.floor((today - start) / (1000 * 60 * 60 * 24));
 };
 
+//fungsi ini adalah modal alert global untuk nampilih pesan error/peringatan
 function ErrorModal({ message, onClose }) {
   if (!message) return null;
   return (
@@ -80,6 +83,7 @@ function ErrorModal({ message, onClose }) {
   );
 }
 
+//fungsi ini untuk konfirmasi sebelum hapus perencanaan menu yang ada
 function DeleteConfirmationModal({ isOpen, onClose, onConfirm }) {
   if (!isOpen) return null;
   return (
@@ -114,6 +118,7 @@ function DeleteConfirmationModal({ isOpen, onClose, onConfirm }) {
   );
 }
 
+//POP UP PREFERENSI ANAK (seperti alergi dan makanan fav)
 function PreferenceEditPopup({
   masterAllergies,
   masterIngredients,
@@ -122,6 +127,7 @@ function PreferenceEditPopup({
   onClose,
   isSaving,
 }) {
+  //inisialisasi state lokal
   const [localAllergyIds, setLocalAllergyIds] = useState(
     childData.allergies?.map((a) => a.allergy_category_id || a.id) || [],
   );
@@ -130,6 +136,7 @@ function PreferenceEditPopup({
   );
   const [activeTab, setActiveTab] = useState("allergy");
 
+  //mengatur logika pemilihan alergi
   const toggleAllergy = (id) => {
     let newAllergies = [...localAllergyIds];
     if (newAllergies.includes(id))
@@ -139,6 +146,8 @@ function PreferenceEditPopup({
     const selectedCategories = masterAllergies.filter((a) =>
       newAllergies.includes(a.id),
     );
+
+    //filter bahan makanan kesukaan agar tidak bentrok dengan alergi yang dipilih
     const safePreferences = localPrefIds.filter((prefId) => {
       const prefObj = masterIngredients.find((i) => i.id === prefId);
       if (!prefObj) return false;
@@ -282,6 +291,7 @@ function PreferenceEditPopup({
   );
 }
 
+//fungsi ini adalah pop up untuk mengganti/menukar menu masakan tertentu (swap menu)
 function SwapMenuPopup({
   childId,
   itemToSwap,
@@ -293,6 +303,7 @@ function SwapMenuPopup({
   const [isLoading, setIsLoading] = useState(true);
   const [isSwapping, setIsSwapping] = useState(false);
 
+  //mengambil daftar menu dari API
   useEffect(() => {
     const fetchAlts = async () => {
       try {
@@ -403,6 +414,7 @@ function SwapMenuPopup({
   );
 }
 
+//KARTU RESEP MPASI
 function MealCard({ label, icon, menu, warna, onSwap, onDetail, isLocked }) {
   return (
     <div
@@ -455,6 +467,7 @@ function MealCard({ label, icon, menu, warna, onSwap, onDetail, isLocked }) {
   );
 }
 
+//Main export komponen
 export default function WeeklyPlan() {
   const { activeChild } = useAuth();
   const [childData, setChildData] = useState(null);
@@ -490,6 +503,7 @@ export default function WeeklyPlan() {
   const componentRef = useRef();
   const [isDownloading, setIsDownloading] = useState(false);
 
+  //mengonversi layout cetak menjadi pdf fan download
   const handleDownloadPDF = async () => {
     if (isDownloading) return;
     const element = componentRef.current;
@@ -601,6 +615,7 @@ export default function WeeklyPlan() {
     }
   };
 
+  //mengambil data inisialiasi awal
   useEffect(() => {
     const fetchInit = async () => {
       try {

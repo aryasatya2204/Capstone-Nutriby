@@ -8,13 +8,13 @@ function ArticleCard({ article }) {
       href={article.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition group"
+      className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transform hover:-translate-y-0.5 transition-all duration-300 group"
     >
       <div className="w-full aspect-[4/3] overflow-hidden">
         <img
           src={article.image}
           alt={article.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
         />
       </div>
 
@@ -32,7 +32,7 @@ function ArticleCard({ article }) {
           <span className="text-[10px] text-gray-400 italic">
             Hanya {article.readTime}
           </span>
-          <span className="text-[#8B1E1E] text-[18px] font-bold leading-none group-hover:translate-x-1 transition-transform">
+          <span className="text-[#8B1E1E] text-[18px] font-bold leading-none group-hover:translate-x-1 transition-transform duration-300">
             →
           </span>
         </div>
@@ -45,10 +45,10 @@ export default function Information() {
   const { featuredArticle, dailyQuote, latestArticles } = articlesData;
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#F3EFEA] font-['Lato']">
+    <div className="flex min-h-screen flex-col bg-[#F3EFEA] font-['Lato'] relative animate-[fadeIn_0.5s_ease-out]">
       <NavbarDashboard />
 
-      <main className="flex-grow w-full max-w-2xl mx-auto px-4 py-6">
+      <main className="flex-grow w-full max-w-2xl mx-auto px-4 py-6 animate-[slideUp_0.5s_ease-out_forwards]">
         <div className="mb-5 text-center">
           <h1 className="text-[38px] font-extrabold text-[#8B1E1E] uppercase tracking-wide">
             Info & Tips Si Kecil
@@ -58,12 +58,14 @@ export default function Information() {
           </p>
         </div>
 
+        {/* bagian artikel utama & quote box */}
         <div className="flex gap-4 mb-8">
+          {/* ditambah hover transform melayang halus */}
           <a
             href={featuredArticle.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex gap-3 bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition flex-1 min-w-0"
+            className="flex gap-3 bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md transform hover:-translate-y-0.5 transition-all duration-300 flex-1 min-w-0"
           >
             <img
               src={featuredArticle.image}
@@ -79,17 +81,18 @@ export default function Information() {
                   {featuredArticle.excerpt}
                 </p>
               </div>
-              <span className="mt-2 inline-block text-[11px] font-bold text-[#8B1E1E] border border-[#8B1E1E] rounded-full px-3 py-0.5 w-fit hover:bg-[#8B1E1E] hover:text-white transition">
+              <span className="mt-2 inline-block text-[11px] font-bold text-[#8B1E1E] border border-[#8B1E1E] rounded-full px-3 py-0.5 w-fit hover:bg-[#8B1E1E] hover:text-white transition-colors duration-300">
                 Baca Selengkapnya
               </span>
             </div>
           </a>
 
+          {/* box mini quote harian orang tua */}
           <a
             href={dailyQuote.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex flex-col justify-between bg-[#8B1E1E] rounded-2xl p-4 shadow-sm w-[140px] flex-shrink-0 hover:opacity-90 transition"
+            className="flex flex-col justify-between bg-[#8B1E1E] rounded-2xl p-4 shadow-sm w-[140px] flex-shrink-0 hover:opacity-90 transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
           >
             <div>
               <p className="text-[10px] font-bold text-white/70 uppercase tracking-wide mb-2">
