@@ -191,7 +191,7 @@ model ChildPreference {
 // ==========================================
 model Recipe {
   id             Int     @id @default(autoincrement())
-  name           String
+  name           String  
   description    String  @db.Text
   bahan_masakan  String  @db.Text
   instructions   String  @db.Text
