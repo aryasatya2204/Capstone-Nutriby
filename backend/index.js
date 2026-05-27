@@ -16,6 +16,7 @@ const PORT = 3000;
 
 app.use(cors());
 app.use(express.json());
+app.use("/recipes", express.static("recipes"));
 
 // route buat tes
 app.get("/", (req, res) => {

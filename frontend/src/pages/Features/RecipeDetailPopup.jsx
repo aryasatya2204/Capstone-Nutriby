@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 
+const IMG_BASE = "http://localhost:3000";
+
 const formatRupiah = (angka) =>
   new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -30,7 +32,7 @@ export default function RecipeDetailPopup({ menu, onClose }) {
         <div className="relative h-28 sm:h-44 bg-gray-100 w-full flex-shrink-0 transition-all">
           {menu.image_url ? (
             <img
-              src={menu.image_url}
+              src={`${IMG_BASE}/${menu.image_url}`}
               alt={menu.name}
               className="w-full h-full object-cover"
             />

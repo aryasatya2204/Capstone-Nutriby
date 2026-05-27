@@ -9,6 +9,7 @@ import { useAuth } from "../../context/authContext";
 
 //konfigurasi
 const API_BASE = "http://localhost:3000/api";
+const IMG_BASE = "http://localhost:3000";
 const BASE_HARI = [
   "Minggu",
   "Senin",
@@ -426,7 +427,11 @@ function MealCard({ label, icon, menu, warna, onSwap, onDetail, isLocked }) {
         className={`flex-shrink-0 w-11 h-11 rounded-xl ${warna} flex items-center justify-center text-lg overflow-hidden ${isLocked && "grayscale"}`}
       >
         {menu?.image_url ? (
-          <img src={menu.image_url} alt="" className="w-11 h-11 object-cover" />
+          <img
+            src={`${IMG_BASE}/${menu.image_url}`}
+            alt=""
+            className="w-11 h-11 object-cover"
+          />
         ) : (
           icon
         )}
