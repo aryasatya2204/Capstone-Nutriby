@@ -84,7 +84,7 @@ Ikuti panduan di bawah ini untuk mengatur dan menjalankan proyek secara lokal di
 Berikut perangkat yang kami gunakan:
 
 - [Node.js](https://nodejs.org/) (v24.14.0)
-- [Python](https://www.python.org/) (v24.14.0)
+- [Python](https://www.python.org/) (3.11.9)
 - [Git](https://git-scm.com)
 - Database SQL lokal (PostgreSQL)
 
