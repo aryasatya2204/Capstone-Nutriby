@@ -35,10 +35,7 @@ async function main() {
         update: {},
         create: { item_name: childName, category_id: category.id },
       });
-      allAllergyItems.push({
-        keyword: childName.toLowerCase(),
-        categoryId: category.id,
-      });
+      allAllergyItems.push({ keyword: childName.toLowerCase(), categoryId: category.id });
     }
   }
 
@@ -50,25 +47,26 @@ async function main() {
     .on("end", async () => {
       try {
         for (const row of resultsCSV) {
-          const name = row["name"];
+          const name = row["Nama_Menu"];
           if (!name) continue;
 
-          // Siapkan data relasi
+          // scan potensi alergi
           const textToScan =
-            `${name} ${row["Deskripsi"] || ""} ${row["Bahan_Masakan"] || ""} ${row["Bahan_Utama"] || ""}`.toLowerCase();
+            `${row["Nama_Menu"] || ""} ${row["Deskripsi"] || ""} ${row["Bahan_Masakan"] || ""} ${row["Bahan_Utama"] || ""} ${row["Potensi_Alergi"] || ""}`.toLowerCase();
           const detectedCategoryIds = new Set();
           allAllergyItems.forEach((item) => {
-            if (textToScan.includes(item.keyword))
-              detectedCategoryIds.add(item.categoryId);
+            if (textToScan.includes(item.keyword)) detectedCategoryIds.add(item.categoryId);
           });
 
           const pivotAlergiData = Array.from(detectedCategoryIds).map((id) => ({
             allergy_category_id: id,
           }));
+
           const bahanUtamaArray = (row["Bahan_Utama"] || "")
             .split(",")
             .map((b) => b.trim())
             .filter((b) => b !== "");
+
           const pivotBahanUtamaData = bahanUtamaArray.map((bahan) => ({
             ingredient: {
               connectOrCreate: {
@@ -78,28 +76,25 @@ async function main() {
             },
           }));
 
-          // 3. Update atau Create dengan logika gambar
+          // 3. Update atau Create
           const existingRecipe = await prisma.recipe.findFirst({
-            where: { name: name },
+            where: { name },
           });
 
           if (existingRecipe) {
-            // Hanya update jika image_url saat ini null/kosong dan ada URL baru di CSV
-            if (
-              (!existingRecipe.image_url || existingRecipe.image_url === "") &&
-              row["Image_URL"]
-            ) {
+            // hanya update image kalau masih kosong dan CSV punya URL baru
+            if ((!existingRecipe.image_url || existingRecipe.image_url === "") && row["Image_URL"]) {
               await prisma.recipe.update({
                 where: { id: existingRecipe.id },
                 data: { image_url: row["Image_URL"] },
               });
-              console.log(`✅ Gambar diperbarui untuk: ${name}`);
+              console.log(`✅ Gambar diperbarui: ${name}`);
             }
           } else {
-            // Create baru
+            // simpan resep baru ke database
             await prisma.recipe.create({
               data: {
-                name: name,
+                name: row["Nama_Menu"],
                 description: row["Deskripsi"] || "",
                 bahan_masakan: row["Bahan_Masakan"] || "",
                 instructions: row["Cara_Masak"] || "",

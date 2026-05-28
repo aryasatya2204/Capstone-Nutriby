@@ -25,6 +25,7 @@ export function AuthProvider({ children }) {
 
   const [children_list, setChildrenList] = useState([]);
   const [activeChild, setActiveChildState] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(0); // ← trigger refresh
 
   // ambil data semua anak
   const fetchChildren = useCallback(async () => {
@@ -45,6 +46,7 @@ export function AuthProvider({ children }) {
       const active = found || list[0] || null;
       setActiveChildState(active);
       if (active) localStorage.setItem("activeChildId", active.id);
+      setLastUpdated(Date.now()); // update timestamp setiap kali fetch selesai
     } catch (err) {
       console.error("Gagal fetch children:", err);
     }
@@ -94,6 +96,7 @@ export function AuthProvider({ children }) {
         setActiveChild,
         children_list,
         fetchChildren,
+        lastUpdated, // expose ke seluruh app
       }}
     >
       {children}

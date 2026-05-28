@@ -5,6 +5,8 @@ import gambarDashboard from "../assets/gambarDashboard.jpeg";
 import RecipeDetailPopup from "./Features/RecipeDetailPopup";
 import { useAuth } from "../context/authContext";
 
+const IMG_BASE = "http://localhost:3000";
+
 // hitung hari buat nentuin menu mpasi
 const calculateDayOffset = (createdAt) => {
   if (!createdAt) return 0;
@@ -16,7 +18,7 @@ const calculateDayOffset = (createdAt) => {
 };
 
 export default function Dashboard() {
-  const { activeChild: contextActiveChild, fetchChildren } = useAuth();
+  const { activeChild: contextActiveChild } = useAuth();
   const [childData, setChildData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -39,20 +41,13 @@ export default function Dashboard() {
   const [todayMenu, setTodayMenu] = useState(null);
   const [selectedMenuDetail, setSelectedMenuDetail] = useState(null);
 
-  // ambil data anak + menu hari ini dari api
+  // ambil data anak + menu hari ini langsung dari context (sudah fresh setelah fetchChildren)
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const res = await fetch("http://localhost:3000/api/children", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        if (!Array.isArray(data) || data.length === 0) return;
+        if (!contextActiveChild) return;
 
-        const targetId = contextActiveChild?.id;
-        const child =
-          (targetId ? data.find((c) => c.id === targetId) : null) ?? data[0];
+        const child = contextActiveChild;
         setChildData(child);
 
         if (child.meal_plans && child.meal_plans.length > 0) {
@@ -86,7 +81,7 @@ export default function Dashboard() {
       }
     };
     fetchDashboardData();
-  }, [contextActiveChild?.id]);
+  }, [contextActiveChild]);
 
   // ambil tips nutrisi harian si bot
   useEffect(() => {
@@ -387,11 +382,17 @@ export default function Dashboard() {
                     {latestLog.status_hfa || "-"}
                   </span>
                 </div>
-                <div className="rounded-xl bg-red-50 p-3 flex justify-between items-center text-sm border border-red-100">
-                  <span className="font-medium text-red-700">
+                <div
+                  className={`rounded-xl p-3 flex justify-between items-center text-sm border ${latestLog.status_wfh?.toLowerCase().includes("normal") || latestLog.status_wfh?.toLowerCase().includes("baik") ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100"}`}
+                >
+                  <span
+                    className={`font-medium ${latestLog.status_wfh?.toLowerCase().includes("normal") || latestLog.status_wfh?.toLowerCase().includes("baik") ? "text-green-700" : "text-red-700"}`}
+                  >
                     Proporsi Berat & Tinggi:
                   </span>
-                  <span className="font-bold text-[#8B2020]">
+                  <span
+                    className={`font-bold ${latestLog.status_wfh?.toLowerCase().includes("normal") || latestLog.status_wfh?.toLowerCase().includes("baik") ? "text-green-700" : "text-[#8B2020]"}`}
+                  >
                     {latestLog.status_wfh || "-"}
                   </span>
                 </div>
@@ -585,7 +586,11 @@ export default function Dashboard() {
                           <div className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-white shadow-sm overflow-hidden">
                             {menu?.image_url ? (
                               <img
-                                src={menu.image_url}
+                                src={
+                                  menu.image_url?.startsWith("http")
+                                    ? menu.image_url
+                                    : `${IMG_BASE}/${menu.image_url}`
+                                }
                                 alt=""
                                 className="w-12 h-12 object-cover"
                               />

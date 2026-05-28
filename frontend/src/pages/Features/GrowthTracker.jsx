@@ -153,7 +153,7 @@ function GrowthChart({ data, whoTarget, unit, color = "#8B2020" }) {
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
-          />
+        />
 
         {data.map((d, i) => {
           if (!d.value) return null;
@@ -286,7 +286,9 @@ export default function GrowthTracker() {
     }
 
     const rawDate = lastLog.record_date;
-    const normalizedDate = rawDate.includes("T") ? rawDate : `${rawDate}T00:00:00`;
+    const normalizedDate = rawDate.includes("T")
+      ? rawDate
+      : `${rawDate}T00:00:00`;
     const lastTime = new Date(normalizedDate).getTime();
     const remaining = COOLDOWN_MS - (Date.now() - lastTime);
     setCooldownRemaining(remaining > 0 ? remaining : 0);
@@ -337,7 +339,7 @@ export default function GrowthTracker() {
       }
     };
     fetchAll();
-  }, [checkCooldown]);
+  }, [checkCooldown, activeChild?.id]);
 
   // simpan input log pertumbuhan baru
   const handleSave = async () => {
@@ -371,7 +373,14 @@ export default function GrowthTracker() {
       if (!res.ok) throw new Error(data.message || "Gagal menyimpan data.");
 
       await fetchChildren();
-      const updatedChild = activeChild;
+      const token2 = localStorage.getItem("token");
+      const childRes = await fetch(`${API_BASE}/children`, {
+        headers: { Authorization: `Bearer ${token2}` },
+      });
+      const allChildren = await childRes.json();
+      const updatedChild = Array.isArray(allChildren)
+        ? allChildren.find((c) => c.id === childData.id)
+        : null;
       if (updatedChild) {
         setChildData(updatedChild);
         checkCooldown(updatedChild);
