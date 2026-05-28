@@ -5,6 +5,7 @@ import RecipeDetailPopup from "./RecipeDetailPopup";
 import { useAuth } from "../../context/authContext";
 
 const API_BASE = "http://localhost:3000/api";
+const IMG_BASE = "http://localhost:3000";
 
 const formatRupiah = (n) =>
   new Intl.NumberFormat("id-ID", {
@@ -18,17 +19,17 @@ const formatAngkaRibuan = (val) => {
   return num.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 };
 
-function RecipeCard({ recipe, onClick }) {
+function RecipeCard({ menu, onClick }) {
   return (
     <div
       onClick={onClick}
       className="group bg-white rounded-2xl border border-gray-200 overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-[#8B2020]/50 flex flex-col h-full"
     >
       <div className="h-44 bg-gray-100 relative overflow-hidden flex-shrink-0">
-        {recipe.image_url ? (
+        {menu.image_url ? (
           <img
-            src={recipe.image_url}
-            alt={recipe.name}
+            src={`${IMG_BASE}/${menu.image_url}`}
+            alt={menu.name}
             crossOrigin="anonymous"
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
@@ -38,13 +39,34 @@ function RecipeCard({ recipe, onClick }) {
           </div>
         )}
         <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-[11px] font-black text-[#8B2020] shadow-md border border-white/50">
-          {formatRupiah(Math.round(recipe.est_price))}
+          {formatRupiah(Math.round(menu.est_price))}
         </div>
       </div>
       <div className="p-4 flex-1 flex items-center justify-center">
         <h3 className="text-[15px] font-black text-gray-800 leading-snug text-center group-hover:text-[#8B2020] transition-colors line-clamp-2">
-          {recipe.name}
+          {menu.name}
         </h3>
+      </div>
+    </div>
+  );
+}
+
+function ErrorModal({ message, onClose }) {
+  if (!message) return null;
+  return (
+    <div className="fixed inset-0 z-[700] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl text-center">
+        <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center text-2xl mx-auto mb-4 border border-red-100">
+          ⚠️
+        </div>
+        <h3 className="text-lg font-black text-gray-800 mb-2">Pemberitahuan</h3>
+        <p className="text-sm text-gray-500 mb-6 leading-relaxed">{message}</p>
+        <button
+          onClick={onClose}
+          className="w-full py-3 rounded-xl bg-[#8B2020] text-white text-sm font-black hover:bg-red-800 shadow-md"
+        >
+          Mengerti
+        </button>
       </div>
     </div>
   );
@@ -69,6 +91,7 @@ export default function SearchMenu() {
   const [searchTextPreferences, setSearchTextPreferences] = useState("");
   const [searchTextSearch, setSearchTextSearch] = useState("");
   const [detailPopup, setDetailPopup] = useState(null);
+  const [errorMsg, setErrorMsg] = useState("");
 
   // ambil data master alergi, bahan baku, sama data anak pas halaman pertama kali dibuka
   useEffect(() => {
@@ -83,8 +106,10 @@ export default function SearchMenu() {
           fetch(`${API_BASE}/master/ingredients`, { headers }),
         ]);
 
-        setMasterAllergies(await resAlg.json());
-        setMasterIngredients(await resIng.json());
+        const algData = await resAlg.json();
+        const ingData = await resIng.json();
+        setMasterAllergies(algData);
+        setMasterIngredients(ingData);
 
         if (activeChild) {
           const child = activeChild;
@@ -93,9 +118,15 @@ export default function SearchMenu() {
           setSelectedAllergies(
             child.allergies?.map((a) => a.allergy_category_id) || [],
           );
-          setSelectedPreferences(
-            child.preferences?.map((p) => p.ingredient) || [],
-          );
+
+          // Preferences dari DB hanya punya ingredient_id,
+          // resolve ke objek lengkap menggunakan masterIngredients
+          const prefIds =
+            child.preferences
+              ?.map((p) => p.ingredient_id || p.ingredient?.id || p.id)
+              .filter(Boolean) || [];
+          const resolvedPrefs = ingData.filter((i) => prefIds.includes(i.id));
+          setSelectedPreferences(resolvedPrefs);
 
           // hitung anggaran harian otomatis dari plan bulanan atau cache data anak
           let rawBudget = 0;
@@ -112,9 +143,9 @@ export default function SearchMenu() {
           const roundedBudget = Math.round(rawBudget / 100) * 100;
           setBudgetInput(formatAngkaRibuan(roundedBudget.toString()));
 
-          if (child.last_search_cache && child.last_search_cache.length > 0) {
-            setResults(child.last_search_cache);
-          }
+          // Sengaja tidak pre-populate results dari cache agar user selalu
+          // mendapat hasil segar sesuai filter terbaru saat klik "Cari Menu"
+          setResults([]);
         }
       } catch (err) {
         console.error("Gagal fetch data:", err);
@@ -123,7 +154,7 @@ export default function SearchMenu() {
       }
     };
     fetchAll();
-  }, []);
+  }, [activeChild?.id]);
 
   const handleBudgetChange = (e) => {
     const raw = e.target.value.replace(/\D/g, "");
@@ -250,7 +281,7 @@ export default function SearchMenu() {
       if (resSearch.ok) {
         setResults(dataSearch.data || []);
       } else {
-        alert(dataSearch.message || "Gagal mencari menu.");
+        setErrorMsg(dataSearch.message || "Gagal mencari menu.");
       }
     } catch (err) {
       console.error(err);
@@ -336,7 +367,9 @@ export default function SearchMenu() {
                           key={id}
                           className="bg-red-50 text-[#8B2020] text-[10px] font-black px-2.5 py-1.5 rounded-lg uppercase tracking-wide border border-red-100"
                         >
-                          {cat.name}
+                          {cat.name
+                            .replace(/_/g, " ")
+                            .replace(/\b\w/g, (c) => c.toUpperCase())}
                         </span>
                       ) : null;
                     })
@@ -360,7 +393,9 @@ export default function SearchMenu() {
                           className="w-4 h-4 accent-[#8B2020]"
                         />
                         <span className="text-sm font-bold text-gray-700">
-                          {a.name}
+                          {a.name
+                            .replace(/_/g, " ")
+                            .replace(/\b\w/g, (c) => c.toUpperCase())}
                         </span>
                       </label>
                     ))}
@@ -455,9 +490,6 @@ export default function SearchMenu() {
               <div className="relative" onClick={(e) => e.stopPropagation()}>
                 <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2 flex justify-between items-end">
                   <span> Bahan Pencarian </span>
-                  <span className="text-[9px] bg-green-50 text-green-700 px-2 py-0.5 rounded font-bold border border-green-100">
-                    Bisa 1
-                  </span>
                 </label>
                 <div
                   onClick={() => setOpenDropdown("search")}
@@ -575,19 +607,22 @@ export default function SearchMenu() {
                     Belum Ada Rekomendasi
                   </h3>
                   <p className="text-sm text-gray-400 max-w-sm leading-relaxed font-medium">
-                    Sesuaikan preferensi bahan dan klik tombol "Temukan Resep"
-                    untuk mulai menjelajahi referensi nutrisi ajaib dari AI.
+                    Sesuaikan preferensi bahan dan klik tombol "Cari Menu untuk
+                    Si Kecil" untuk mulai menjelajahi referensi menu MPASI dari
+                    AI.
                   </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {results.map((recipe) => (
-                    <RecipeCard
-                      key={recipe.id}
-                      recipe={recipe}
-                      onClick={() => setDetailPopup(recipe)}
-                    />
-                  ))}
+                  {[...new Map(results.map((m) => [m.name, m])).values()].map(
+                    (menu) => (
+                      <RecipeCard
+                        key={menu.id}
+                        menu={menu}
+                        onClick={() => setDetailPopup(menu)}
+                      />
+                    ),
+                  )}
                 </div>
               )}
             </div>
@@ -603,6 +638,8 @@ export default function SearchMenu() {
           onClose={() => setDetailPopup(null)}
         />
       )}
+
+      <ErrorModal message={errorMsg} onClose={() => setErrorMsg("")} />
     </div>
   );
 }

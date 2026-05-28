@@ -228,12 +228,10 @@ const generateWeeklyPlan = async (req, res) => {
       data: savedPlan,
     });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        message: "Gagal men-generate jadwal mingguan",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Gagal men-generate jadwal mingguan",
+      error: error.message,
+    });
   }
 };
 
@@ -243,14 +241,15 @@ const searchMenuByIngredient = async (req, res) => {
     const { childId } = req.params;
     const { custom_budget, ingredients } = req.body;
 
+    if (!ingredients || !Array.isArray(ingredients) || ingredients.length === 0)
+      return res
+        .status(400)
+        .json({ message: "Minimal satu bahan pencarian harus dipilih." });
+
     const childBase = await prisma.child.findUnique({
       where: { id: childId },
       include: {
-        meal_plans: {
-          where: { plan_type: "Bulanan" },
-          orderBy: { id: "desc" },
-          take: 1,
-        },
+        allergies: { include: { allergy_category: true } },
       },
     });
 
@@ -258,48 +257,83 @@ const searchMenuByIngredient = async (req, res) => {
       return res.status(404).json({ message: "Data anak tidak ditemukan." });
 
     let budgetPerMenu;
-    if (custom_budget !== undefined && custom_budget !== null) {
+    if (
+      custom_budget !== undefined &&
+      custom_budget !== null &&
+      parseFloat(custom_budget) > 0
+    ) {
       budgetPerMenu = parseFloat(custom_budget);
     } else {
-      const activeBulanan = childBase.meal_plans[0];
-      const rawBudget = activeBulanan?.actual_total_cost
-        ? parseFloat(activeBulanan.actual_total_cost) / 90
-        : parseFloat(childBase.optimal_budget_cache) / 30 / 3;
-
-      budgetPerMenu = Math.round(rawBudget / 100) * 100;
+      budgetPerMenu = parseFloat(childBase.optimal_budget_cache) / 30 / 3;
     }
 
-    const mlDailyBudget = budgetPerMenu * 3;
-    const { approvedRecipes } = await getScoredRecipesFromML(
-      childId,
-      mlDailyBudget,
+    const ageInMonths = getAgeInMonths(childBase.dob);
+    const allergyCategoryIds = childBase.allergies.map(
+      (a) => a.allergy_category_id,
     );
 
-    let filteredRecipes = approvedRecipes.filter(
-      (r) => parseFloat(r.est_price) <= budgetPerMenu,
-    );
-
-    if (ingredients && Array.isArray(ingredients) && ingredients.length > 0) {
-      const keywords = ingredients.map((i) => i.toLowerCase());
-      filteredRecipes = filteredRecipes.filter((r) => {
-        const bahanLower = r.bahan_masakan.toLowerCase();
-        const nameLower = r.name.toLowerCase();
-        return keywords.some(
-          (keyword) =>
-            bahanLower.includes(keyword) || nameLower.includes(keyword),
-        );
-      });
-    }
-
-    await prisma.child.update({
-      where: { id: childId },
-      data: { last_search_cache: filteredRecipes },
+    // langsung query DB, ga lewat ML
+    // krn candidates ML ga ada field bahan_masakan & bisa buang resep valid (score < 0.6)
+    const matchingRecipes = await prisma.recipe.findMany({
+      where: {
+        min_age_months: { lte: ageInMonths },
+        max_age_months: { gte: ageInMonths },
+        est_price: { lte: budgetPerMenu },
+        ...(allergyCategoryIds.length > 0 && {
+          NOT: {
+            allergies: {
+              some: { allergy_category_id: { in: allergyCategoryIds } },
+            },
+          },
+        }),
+        // OR logic: muncul kalau ada SALAH SATU bahan yang cocok (partial match)
+        ingredients: {
+          some: {
+            ingredient: {
+              OR: ingredients.map((i) => ({
+                name: { contains: i, mode: "insensitive" },
+              })),
+            },
+          },
+        },
+      },
+      include: {
+        ingredients: { include: { ingredient: true } },
+        allergies: { include: { allergy_category: true } },
+      },
+      orderBy: { est_price: "asc" },
     });
 
+    const keywords = ingredients.map((i) => i.toLowerCase());
+    const formattedResults = matchingRecipes.map((r) => ({
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      bahan_masakan: r.bahan_masakan,
+      instructions: r.instructions,
+      min_age_months: r.min_age_months,
+      max_age_months: r.max_age_months,
+      texture: r.texture,
+      est_price: parseFloat(r.est_price),
+      calories: parseFloat(r.calories),
+      protein: parseFloat(r.protein),
+      fat: parseFloat(r.fat),
+      iron: parseFloat(r.iron),
+      zinc: parseFloat(r.zinc),
+      tags: r.tags,
+      image_url: r.image_url,
+      matched_ingredients: r.ingredients
+        .filter((i) =>
+          keywords.some((kw) => i.ingredient.name.toLowerCase().includes(kw)),
+        )
+        .map((i) => i.ingredient.name),
+    }));
+
     res.status(200).json({
-      message: `Berhasil menemukan rekomendasi menu.`,
+      message: `Berhasil menemukan ${formattedResults.length} menu.`,
       budget_per_menu_applied: budgetPerMenu,
-      data: filteredRecipes,
+      age_months: ageInMonths,
+      data: formattedResults,
     });
   } catch (error) {
     res

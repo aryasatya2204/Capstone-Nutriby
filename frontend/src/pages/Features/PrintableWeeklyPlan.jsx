@@ -1,5 +1,7 @@
 import { forwardRef } from "react";
 
+const IMG_BASE = "http://localhost:3000";
+
 const formatRupiah = (angka) =>
   new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -386,7 +388,7 @@ const PrintableWeeklyPlan = forwardRef(
                         >
                           {menu.image_url ? (
                             <img
-                              src={menu.image_url}
+                              src={`${IMG_BASE}/${menu.image_url}`}
                               alt={menu.name}
                               crossOrigin="anonymous"
                               style={{

@@ -5,4 +5,5 @@ node_modules
 /generated/prisma
 
 allergy_mapping.json
-Resep_MPASI.csvrecipes/ 
+Resep_MPASI.csv
+recipes/ 

@@ -61,7 +61,7 @@ async function main() {
         for (const row of resultsCSV) {
           // scan potensi alergi
           const textToScan =
-            `${row["name"] || ""} ${row["description"] || ""} ${row["Bahan_Masakan"] || ""} ${row["Bahan_Utama"] || ""} ${row["Potensi_Alergi"] || ""}`.toLowerCase();
+            `${row["Nama_Menu"] || ""} ${row["Deskripsi"] || ""} ${row["Bahan_Masakan"] || ""}  ${row["Bahan_Utama"] || ""} ${row["Potensi_Alergi"] || ""}`.toLowerCase();
           const detectedCategoryIds = new Set();
 
           for (const item of allAllergyItems) {
@@ -93,11 +93,10 @@ async function main() {
           // simpan data resep ke database
           await prisma.recipe.create({
             data: {
-              name: row["name"],
-              description: row["description"] || "",
+              name: row["Nama_Menu"],
+              description: row["Deskripsi"] || "",
               bahan_masakan: row["Bahan_Masakan"] || "",
-              instructions: row["instructions"] || "",
-
+              instructions: row["Cara_Masak"] || "",
               min_age_months: parseInt(row["Usia_Min"]) || 6,
               max_age_months: parseInt(row["Usia_Max"]) || 24,
               texture: row["Tekstur"] || "Halus",
