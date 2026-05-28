@@ -62,11 +62,16 @@ Proyek ini dibangun menggunakan arsitektur _microservices-lite_ dengan pemisahan
 
 ## ✨ Key Features
 
-- 📈 **Growth Tracker** — Pantau tinggi dan berat badan anak dengan grafik perkembangan visual, lengkap dengan kemampuan ekspor laporan ke format PDF.
-- 🤖 **Nutribot (AI Assistant)** — Konsultan gizi AI 24/7 yang dipersonalisasi menggunakan persona khusus pendamping orang tua.
-- 🍲 **MPASI & Weekly Meal Planner** — Rekomendasi resep dan jadwal makan cerdas yang disesuaikan dengan usia dan pemetaan alergi anak (_Allergy Mapping_).
-- 👦 **Child Profile Management** — Kelola beberapa profil anak sekaligus dengan metrik nutrisi yang terisolasi dan spesifik.
-- 📊 **Insight Dashboard** — Dasbor analitik ringkas untuk melihat ringkasan status gizi harian.
+- 📈 **Growth Tracker** 
+Pantau tinggi dan berat badan anak dengan grafik perkembangan visual, lengkap dengan kemampuan ekspor laporan ke format PDF.
+- 🤖 **Nutribot (AI Assistant)** 
+Konsultan gizi AI 24/7 yang dipersonalisasi menggunakan persona khusus pendamping orang tua.
+- 🍲 **MPASI & Weekly Meal Planner** 
+Rekomendasi resep dan jadwal makan cerdas yang disesuaikan dengan usia dan pemetaan alergi anak (_Allergy Mapping_).
+- 👦 **Child Profile Management** 
+Kelola beberapa profil anak sekaligus dengan metrik nutrisi yang terisolasi dan spesifik.
+- 📊 **Insight Dashboard** 
+Dasbor analitik ringkas untuk melihat ringkasan status gizi harian.
 
 ---
 
@@ -76,12 +81,12 @@ Ikuti panduan di bawah ini untuk mengatur dan menjalankan proyek secara lokal di
 
 ### Prerequisites
 
-Pastikan perangkat Anda telah terinstal perangkat lunak berikut:
+Berikut perangkat yang kami gunakan:
 
-- [Node.js](https://nodejs.org/) (v18.x atau lebih baru)
-- [Python](https://www.python.org/) (v3.9 atau lebih baru)
-- [Git](https://git-scm.com/)
-- Database SQL lokal (MySQL atau PostgreSQL)
+- [Node.js](https://nodejs.org/) (v24.14.0)
+- [Python](https://www.python.org/) (v24.14.0)
+- [Git](https://git-scm.com)
+- Database SQL lokal (PostgreSQL)
 
 ### Installation
 
@@ -150,17 +155,16 @@ npm run dev
 
 ## 📸 Usage & Screenshots
 
-> _(Ganti URL gambar di bawah dengan path screenshot aplikasi yang sebenarnya)_
-
 | Dashboard Utama | Growth Tracker | AI Nutribot   |
 | --------------- | -------------- | ------------- |
-| ![Dashboard]()  | ![Tracker]()   | ![Nutribot]() |
+| ![Dashboard](screenshots/dashboard.png)  | ![Tracker](screenshots/smarthGrowthTracker.png)   | ![Nutribot](screenshots/nutribot.png) |
 
 **Cara Penggunaan:**
 
 1. **Registrasi Anak** — Daftarkan profil anak di halaman `ChildRegistration`.
-2. **Pemantauan** — Masukkan data harian anak di menu `Features > GrowthTracker`.
-3. **Eksplorasi** — Temukan jadwal MPASI di `Features > WeeklyPlan` atau tanyakan kendala spesifik pada Nutribot.
+2. **Ringkasan** — Temukan ringkasan data mengenai anak Anda setiap login kembali
+3. **Pemantauan** — Masukkan data harian anak di menu `Features > GrowthTracker`.
+4. **Eksplorasi** — Temukan jadwal MPASI di `Features > WeeklyPlan` atau tanyakan kendala spesifik pada Nutribot.
 
 ---
 
