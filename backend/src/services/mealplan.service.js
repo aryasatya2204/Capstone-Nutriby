@@ -63,7 +63,7 @@ const executeMealPlanAI = async (childId, isUpdate = false) => {
     };
 
     const mlResponse = await axios.post(
-      "http://127.0.0.1:8000/recommend",
+      "https://aryasatya2204-recomendasi-menu.hf.space/recommend",
       mlPayload,
     );
     const passedRecommendations = mlResponse.data.recommendations.filter(
