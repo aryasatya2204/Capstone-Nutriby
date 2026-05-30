@@ -286,16 +286,10 @@ const searchMenuByIngredient = async (req, res) => {
             },
           },
         }),
-        // OR logic: muncul kalau ada SALAH SATU bahan yang cocok (partial match)
-        ingredients: {
-          some: {
-            ingredient: {
-              OR: ingredients.map((i) => ({
-                name: { contains: i, mode: "insensitive" },
-              })),
-            },
-          },
-        },
+        // AND logic: muncul kalau ada SALAH SATU bahan yang cocok (partial match)
+        AND: ingredients.map((i) => ({
+  bahan_utama: { contains: i, mode: "insensitive" },
+})),
       },
       include: {
         ingredients: { include: { ingredient: true } },

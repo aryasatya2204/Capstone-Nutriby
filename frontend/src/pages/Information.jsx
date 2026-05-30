@@ -59,29 +59,29 @@ export default function Information() {
         </div>
 
         {/* bagian artikel utama & quote box */}
-        <div className="flex gap-4 mb-8">
-          {/* ditambah hover transform melayang halus */}
+        <div className="flex gap-3 mb-8 items-stretch">
+          {/* featured article */}
           <a
             href={featuredArticle.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex gap-3 bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md transform hover:-translate-y-0.5 transition-all duration-300 flex-1 min-w-0"
+            className="flex flex-col gap-2 bg-white rounded-2xl p-3 shadow-sm border border-gray-100 hover:shadow-md transform hover:-translate-y-0.5 transition-all duration-300 flex-1 min-w-0"
           >
             <img
               src={featuredArticle.image}
               alt={featuredArticle.title}
-              className="w-[90px] h-[90px] rounded-xl object-cover flex-shrink-0"
+              className="w-full h-[90px] rounded-xl object-cover flex-shrink-0"
             />
-            <div className="flex flex-col justify-between min-w-0">
+            <div className="flex flex-col justify-between flex-1 min-w-0">
               <div>
-                <h2 className="text-[13px] font-bold text-gray-800 leading-snug line-clamp-2 mb-1">
+                <h2 className="text-[12px] font-bold text-gray-800 leading-snug line-clamp-2 mb-1">
                   {featuredArticle.title}
                 </h2>
-                <p className="text-[11px] text-gray-500 line-clamp-3 leading-relaxed">
+                <p className="text-[10px] text-gray-500 line-clamp-2 leading-relaxed">
                   {featuredArticle.excerpt}
                 </p>
               </div>
-              <span className="mt-2 inline-block text-[11px] font-bold text-[#8B1E1E] border border-[#8B1E1E] rounded-full px-3 py-0.5 w-fit hover:bg-[#8B1E1E] hover:text-white transition-colors duration-300">
+              <span className="mt-2 self-start text-[10px] font-bold text-[#8B1E1E] border border-[#8B1E1E] rounded-full px-2.5 py-0.5 hover:bg-[#8B1E1E] hover:text-white transition-colors duration-300 whitespace-nowrap">
                 Baca Selengkapnya
               </span>
             </div>
@@ -92,7 +92,7 @@ export default function Information() {
             href={dailyQuote.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex flex-col justify-between bg-[#8B1E1E] rounded-2xl p-4 shadow-sm w-[140px] flex-shrink-0 hover:opacity-90 transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+            className="flex flex-col justify-between bg-[#8B1E1E] rounded-2xl p-3 shadow-sm w-[38%] flex-shrink-0 hover:opacity-90 transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
           >
             <div>
               <p className="text-[10px] font-bold text-white/70 uppercase tracking-wide mb-2">
