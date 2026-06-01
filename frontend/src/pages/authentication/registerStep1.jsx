@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../context/authContext";
 import { GoogleLogin } from "@react-oauth/google";
 import verified from "../../assets/verified.png";
+import { apiFetch } from "../../config/api";
+import { useNavigate } from "react-router-dom";
 
 function RegisterStep1({ onClose, onShowLogin, onNext }) {
-  const { login } = useAuth();
+  const { login, fetchChildren } = useAuth();
+  const navigate = useNavigate();
 
   const [form, setForm] = useState({ username: "", email: "", password: "" });
   const [error, setError] = useState("");
@@ -15,6 +18,15 @@ function RegisterStep1({ onClose, onShowLogin, onNext }) {
   const [emailError, setEmailError] = useState("");
 
   const isGmail = (email) => /^[^\s@]+@gmail\.com$/.test(email);
+
+  const containerRef = useRef(null);
+  const [btnWidth, setBtnWidth] = useState(380);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      setBtnWidth(containerRef.current.offsetWidth);
+    }
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -61,7 +73,8 @@ function RegisterStep1({ onClose, onShowLogin, onNext }) {
     setError("");
 
     try {
-      const response = await fetch("http://localhost:3000/api/auth/register", {
+      // ✅ PERBAIKAN: Pakai apiFetch, bukan fetch ke localhost
+      const response = await apiFetch("/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -74,13 +87,16 @@ function RegisterStep1({ onClose, onShowLogin, onNext }) {
       const data = await response.json();
 
       if (response.status === 201) {
-        setShowSuccess(true);
         localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user)); // tambah ini juga
         login(data.user);
+        setShowSuccess(true);
 
-        setTimeout(() => {
+        setTimeout(async () => {
+          await fetchChildren();
           setShowSuccess(false);
-          if (onNext) onNext();
+          onClose();
+          navigate("/dashboard");
         }, 2500);
       } else {
         setError(data.message || "Registrasi gagal. Silakan coba lagi.");
@@ -96,8 +112,8 @@ function RegisterStep1({ onClose, onShowLogin, onNext }) {
     setIsLoading(true);
     setError("");
     try {
-      const res = await fetch("http://localhost:3000/api/auth/google", {
-        // fix: https → http
+      // ✅ PERBAIKAN: Pakai apiFetch, bukan fetch ke localhost
+      const res = await apiFetch("/auth/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken: credentialResponse.credential }),
@@ -106,12 +122,15 @@ function RegisterStep1({ onClose, onShowLogin, onNext }) {
 
       if (res.ok) {
         setShowSuccess(true);
-        localStorage.setItem("token", data.token);
+        localStorage.setItem("token", data.token); // ✅ Token tersimpan dengan benar
+        localStorage.setItem("user", JSON.stringify(data.user));
         login(data.user);
 
-        setTimeout(() => {
+        setTimeout(async () => {
+          await fetchChildren();
           setShowSuccess(false);
-          if (onNext) onNext();
+          onClose();
+          navigate("/dashboard");
         }, 2500);
       } else {
         setError(data.message || "Google Register gagal.");
@@ -235,13 +254,13 @@ function RegisterStep1({ onClose, onShowLogin, onNext }) {
             <div className="h-px w-20 bg-white/60"></div>
           </div>
 
-          <div className="w-full">
+          <div ref={containerRef} className="w-full">
             <GoogleLogin
               onSuccess={handleGoogleSuccess}
               onError={() => setError("Registrasi Google Gagal")}
               theme="outline"
               size="large"
-              width="340px"
+              width={btnWidth}
               text="signup_with"
             />
           </div>

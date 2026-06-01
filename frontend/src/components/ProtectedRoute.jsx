@@ -1,39 +1,17 @@
-import { useEffect, useState } from "react";
-import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../context/authContext";
 
 export default function ProtectedRoute() {
-  const { user } = useAuth();
-  const location = useLocation();
-  const [hasChild, setHasChild] = useState(null);
+  const { user, children_list, lastUpdated } = useAuth();
+  const token = localStorage.getItem("token");
 
-  useEffect(() => {
-    const checkChildData = async () => {
-      const token = localStorage.getItem("token");
+  // belum login sama sekali
+  if (!user && !token) {
+    return <Navigate to="/" replace />;
+  }
 
-      // jika tidak ada token dan user
-      if (!user && !token) {
-        setHasChild(false);
-        return;
-      }
-
-      try {
-        const res = await fetch("http://localhost:3000/api/children", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        // cek data anak
-        setHasChild(data && data.length > 0);
-      } catch (error) {
-        setHasChild(false);
-      }
-    };
-
-    checkChildData();
-  }, [user]);
-
-  // loading saat cek data anak
-  if (hasChild === null) {
+  // masih loading, tunggu fetchChildren selesai
+  if (lastUpdated === 0) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#8B2020] text-white">
         <div className="flex flex-col items-center">
@@ -44,14 +22,8 @@ export default function ProtectedRoute() {
     );
   }
 
-  // cek login user
-  const token = localStorage.getItem("token");
-  if (!user && !token) {
-    return <Navigate to="/" replace />;
-  }
-
-  // jika belum punya anak
-  if (!hasChild) {
+  // sudah selesai fetch tapi tidak punya data anak
+  if (children_list.length === 0) {
     return (
       <Navigate
         to="/"
@@ -65,6 +37,6 @@ export default function ProtectedRoute() {
     );
   }
 
-  // lolos ke dashboard
+  // lolos semua pengecekan, masuk dashboard
   return <Outlet />;
 }

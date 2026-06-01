@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/authContext";
 import { GoogleLogin } from "@react-oauth/google";
 import verified from "../../assets/verified.png";
+import { apiFetch } from "../../config/api.js";
 
 function LoginForm({ onClose, onShowRegister, onShowAuth }) {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, fetchChildren } = useAuth();
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -14,6 +15,15 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
   const [emailError, setEmailError] = useState(""); // validasi email inline
 
   const isGmail = (email) => /^[^\s@]+@gmail\.com$/.test(email);
+
+  const containerRef = useRef(null);
+  const [btnWidth, setBtnWidth] = useState(380);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      setBtnWidth(containerRef.current.offsetWidth);
+    }
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -45,7 +55,7 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
 
     setIsLoading(true);
     try {
-      const res = await fetch("http://localhost:3000/api/auth/login", {
+      const res = await apiFetch("/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -76,7 +86,7 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
 
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
-      const res = await fetch("http://localhost:3000/api/auth/google", {
+      const res = await apiFetch("/auth/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken: credentialResponse.credential }),
@@ -202,17 +212,16 @@ function LoginForm({ onClose, onShowRegister, onShowAuth }) {
           </span>
         </div>
 
-        <div className="w-full">
+        <div ref={containerRef} className="w-full">
           <GoogleLogin
             onSuccess={handleGoogleSuccess}
             onError={() => setError("Google Login Failed")}
             theme="outline"
             size="large"
-            width="100%"
+            width={btnWidth}
             text="continue_with"
           />
         </div>
-
         <p className="mt-8 text-center text-[14px] text-white/90">
           Belum punya akun?{" "}
           <button

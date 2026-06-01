@@ -5,8 +5,6 @@ import ChildRegistration from "./ChildRegistration";
 import { useAuth } from "../context/authContext";
 import { useNavigate } from "react-router-dom";
 
-const API_BASE = "http://localhost:3000/api";
-
 // fungsi buat hitung umur otomatis dari tgl lahir biar jd teks singkat kayak 5 bln atau 2thn
 const getAgeLabel = (dob) => {
   if (!dob) return "";

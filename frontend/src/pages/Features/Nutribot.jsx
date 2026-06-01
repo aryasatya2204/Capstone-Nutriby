@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import NavbarDashboard from "../../components/NavbarDashboard";
 import FooterDashboard from "../../components/FooterDashboard";
 import { useAuth } from "../../context/authContext";
+import { apiFetch } from "../../config/api";
 
 // DATA PREFERENSI PERTANYAAN (SUGGESTIONS)
 const SUGGESTIONS = {
@@ -68,6 +69,7 @@ export default function Nutribot() {
   const [inputMessage, setInputMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [spamWarning, setSpamWarning] = useState(false);
 
   // State Mobile Sidebar
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -85,12 +87,9 @@ export default function Nutribot() {
   // Load Sessions
   const loadAllSessions = async (childId, token) => {
     try {
-      const res = await fetch(
-        `http://localhost:3000/api/bot/sessions/${childId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      const res = await apiFetch(`/bot/sessions/${childId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const data = await res.json();
       if (Array.isArray(data)) setSessions(data);
     } catch (error) {
@@ -135,12 +134,9 @@ export default function Nutribot() {
 
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(
-        `http://localhost:3000/api/bot/session/${session.id}/messages`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      const res = await apiFetch(`/bot/session/${session.id}/messages`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       if (res.ok) {
         const data = await res.json();
@@ -179,7 +175,7 @@ export default function Nutribot() {
 
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:3000/api/bot/session", {
+      const res = await apiFetch("/bot/session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -219,7 +215,7 @@ export default function Nutribot() {
 
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:3000/api/bot/chat", {
+      const res = await apiFetch("/bot/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -269,13 +265,26 @@ export default function Nutribot() {
     }
   };
 
+  const showSpamWarning = () => {
+    setSpamWarning(true);
+    setTimeout(() => setSpamWarning(false), 2500);
+  };
+
   const handleFormSubmit = (e) => {
     e.preventDefault();
+    if (isSending) {
+      showSpamWarning();
+      return;
+    }
     submitMessage(inputMessage, activeSession);
   };
 
   // Handler Klik Pertanyaan Rekomendasi (Fix Race Condition)
   const handleSuggestionClick = async (text) => {
+    if (isSending) {
+      showSpamWarning();
+      return;
+    }
     let targetSession = activeSession;
 
     // Jika sesi belum ada, buat sesi baru TANPA memicu efek Fetching Messages yang menimpa layar
@@ -572,6 +581,11 @@ export default function Nutribot() {
 
             {/* Input Chat Area */}
             <div className="p-3 md:p-5 bg-white border-t border-gray-100 shrink-0 z-10">
+              {spamWarning && (
+                <div className="mb-2 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-xl text-xs font-bold text-yellow-700 text-center transition-all">
+                  ⏳ Tunggu dulu, NutriBot sedang memproses pesanmu!
+                </div>
+              )}
               {activeSession && activeSession.is_active && (
                 <div className="flex justify-between items-center mb-2 px-1">
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">

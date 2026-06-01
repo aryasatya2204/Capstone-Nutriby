@@ -10,6 +10,11 @@ const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
+console.log("ingredientList:", ingredientList);
+console.log("budgetPerMenu:", budgetPerMenu);
+console.log("ageInMonths:", ageInMonths);
+console.log("matchingRecipes count:", matchingRecipes.length);
+
 // ambil resep lolos filter gizi dan alergi dari model ml
 const getScoredRecipesFromML = async (childId, mlDailyBudget) => {
   const child = await prisma.child.findUnique({
@@ -241,10 +246,7 @@ const searchMenuByIngredient = async (req, res) => {
     const { childId } = req.params;
     const { custom_budget, ingredients } = req.body;
 
-    if (!ingredients || !Array.isArray(ingredients) || ingredients.length === 0)
-      return res
-        .status(400)
-        .json({ message: "Minimal satu bahan pencarian harus dipilih." });
+    const ingredientList = Array.isArray(ingredients) ? ingredients : [];
 
     const childBase = await prisma.child.findUnique({
       where: { id: childId },
@@ -272,8 +274,6 @@ const searchMenuByIngredient = async (req, res) => {
       (a) => a.allergy_category_id,
     );
 
-    // langsung query DB, ga lewat ML
-    // krn candidates ML ga ada field bahan_masakan & bisa buang resep valid (score < 0.6)
     const matchingRecipes = await prisma.recipe.findMany({
       where: {
         min_age_months: { lte: ageInMonths },
@@ -286,10 +286,11 @@ const searchMenuByIngredient = async (req, res) => {
             },
           },
         }),
-        // AND logic: muncul kalau ada SALAH SATU bahan yang cocok (partial match)
-        AND: ingredients.map((i) => ({
-  bahan_utama: { contains: i, mode: "insensitive" },
-})),
+        ...(ingredientList.length > 0 && {
+          OR: ingredientList.map((i) => ({
+            bahan_utama: { contains: i, mode: "insensitive" },
+          })),
+        }),
       },
       include: {
         ingredients: { include: { ingredient: true } },
@@ -298,7 +299,7 @@ const searchMenuByIngredient = async (req, res) => {
       orderBy: { est_price: "asc" },
     });
 
-    const keywords = ingredients.map((i) => i.toLowerCase());
+    const keywords = ingredientList.map((i) => i.toLowerCase());
     const formattedResults = matchingRecipes.map((r) => ({
       id: r.id,
       name: r.name,
@@ -316,11 +317,16 @@ const searchMenuByIngredient = async (req, res) => {
       zinc: parseFloat(r.zinc),
       tags: r.tags,
       image_url: r.image_url,
-      matched_ingredients: r.ingredients
-        .filter((i) =>
-          keywords.some((kw) => i.ingredient.name.toLowerCase().includes(kw)),
-        )
-        .map((i) => i.ingredient.name),
+      matched_ingredients:
+        ingredientList.length > 0
+          ? r.ingredients
+              .filter((i) =>
+                keywords.some((kw) =>
+                  i.ingredient.name.toLowerCase().includes(kw),
+                ),
+              )
+              .map((i) => i.ingredient.name)
+          : [],
     }));
 
     res.status(200).json({

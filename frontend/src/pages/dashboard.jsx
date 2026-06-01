@@ -4,8 +4,7 @@ import FooterDashboard from "../components/FooterDashboard";
 import gambarDashboard from "../assets/gambarDashboard.jpeg";
 import RecipeDetailPopup from "./Features/RecipeDetailPopup";
 import { useAuth } from "../context/authContext";
-
-const IMG_BASE = "http://localhost:3000";
+import { apiFetch, getImageUrl } from "../config/api.js";
 
 // hitung hari buat nentuin menu mpasi
 const calculateDayOffset = (createdAt) => {
@@ -18,7 +17,7 @@ const calculateDayOffset = (createdAt) => {
 };
 
 export default function Dashboard() {
-  const { activeChild: contextActiveChild } = useAuth();
+  const { activeChild: contextActiveChild, children_list } = useAuth();
   const [childData, setChildData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -41,12 +40,21 @@ export default function Dashboard() {
   const [todayMenu, setTodayMenu] = useState(null);
   const [selectedMenuDetail, setSelectedMenuDetail] = useState(null);
 
+  // tambah ini:
+  console.log("=== DASHBOARD DEBUG ===");
+  console.log("contextActiveChild:", contextActiveChild);
+  console.log("children_list:", children_list);
+  console.log("token:", localStorage.getItem("token"));
+  console.log("user:", localStorage.getItem("user"));
+
   // ambil data anak + menu hari ini langsung dari context (sudah fresh setelah fetchChildren)
   useEffect(() => {
     const fetchDashboardData = async () => {
+      if (!contextActiveChild) {
+        setIsLoading(false);
+        return;
+      }
       try {
-        if (!contextActiveChild) return;
-
         const child = contextActiveChild;
         setChildData(child);
 
@@ -91,10 +99,9 @@ export default function Dashboard() {
       setIsInsightLoading(true);
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch(
-          `http://localhost:3000/api/insight/daily/${childData.id}`,
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
+        const res = await apiFetch(`/insight/daily/${childData.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         const data = await res.json();
         if (res.ok) setDailyInsight(data.insight);
       } catch (err) {
@@ -112,10 +119,10 @@ export default function Dashboard() {
       const token = localStorage.getItem("token");
       try {
         const [resAllergy, resIngred] = await Promise.all([
-          fetch("http://localhost:3000/api/master/allergies", {
+          apiFetch("/master/allergies", {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch("http://localhost:3000/api/master/ingredients", {
+          apiFetch("/master/ingredients", {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
@@ -245,20 +252,17 @@ export default function Dashboard() {
       const token = localStorage.getItem("token");
       const cleanSalary = editFormData.parent_salary.replace(/\./g, "");
 
-      const res = await fetch(
-        `http://localhost:3000/api/children/${childData.id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            ...editFormData,
-            parent_salary: parseFloat(cleanSalary),
-          }),
+      const res = await apiFetch(`/children/${childData.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      );
+        body: JSON.stringify({
+          ...editFormData,
+          parent_salary: parseFloat(cleanSalary),
+        }),
+      });
       const data = await res.json();
       if (res.ok) {
         setChildData(data.data);
@@ -586,11 +590,7 @@ export default function Dashboard() {
                           <div className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-white shadow-sm overflow-hidden">
                             {menu?.image_url ? (
                               <img
-                                src={
-                                  menu.image_url?.startsWith("http")
-                                    ? menu.image_url
-                                    : `${IMG_BASE}/${menu.image_url}`
-                                }
+                                src={getImageUrl(menu.image_url)}
                                 alt=""
                                 className="w-12 h-12 object-cover"
                               />

@@ -6,10 +6,9 @@ import html2canvas from "html2canvas";
 import RecipeDetailPopup from "./RecipeDetailPopup";
 import PrintableWeeklyPlan from "./PrintableWeeklyPlan";
 import { useAuth } from "../../context/authContext";
+import { apiFetch, getImageUrl } from "../../config/api.js";
 
 //konfigurasi
-const API_BASE = "http://localhost:3000/api";
-const IMG_BASE = "http://localhost:3000";
 const BASE_HARI = [
   "Minggu",
   "Senin",
@@ -309,8 +308,8 @@ function SwapMenuPopup({
     const fetchAlts = async () => {
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch(
-          `${API_BASE}/mpasi/alternatives/${childId}/${itemToSwap.mealPlanItemId}`,
+        const res = await apiFetch(
+          `/mpasi/alternatives/${childId}/${itemToSwap.mealPlanItemId}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           },
@@ -330,8 +329,8 @@ function SwapMenuPopup({
     setIsSwapping(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(
-        `${API_BASE}/mpasi/mealplan/swap/${itemToSwap.mealPlanItemId}`,
+      const res = await apiFetch(
+        `/mpasi/mealplan/swap/${itemToSwap.mealPlanItemId}`,
         {
           method: "PUT",
           headers: {
@@ -428,7 +427,7 @@ function MealCard({ label, icon, menu, warna, onSwap, onDetail, isLocked }) {
       >
         {menu?.image_url ? (
           <img
-            src={`${IMG_BASE}/${menu.image_url}`}
+            src={getImageUrl(menu.image_url)}
             alt=""
             className="w-11 h-11 object-cover"
           />
@@ -627,15 +626,15 @@ export default function WeeklyPlan() {
         const token = localStorage.getItem("token");
         const headers = { Authorization: `Bearer ${token}` };
         const [resAlg, resIng] = await Promise.all([
-          fetch(`${API_BASE}/master/allergies`, { headers }),
-          fetch(`${API_BASE}/master/ingredients`, { headers }),
+          apiFetch("/master/allergies", { headers }),
+          apiFetch("/master/ingredients", { headers }),
         ]);
         setMasterAllergies(await resAlg.json());
         setMasterIngredients(await resIng.json());
 
         if (activeChild) {
           // Fetch semua anak lalu filter yang aktif (tidak ada endpoint GET /children/:id)
-          const resChildren = await fetch(`${API_BASE}/children`, { headers });
+          const resChildren = await apiFetch("/children", { headers });
           const allChildren = await resChildren.json();
           const child = Array.isArray(allChildren)
             ? (allChildren.find((c) => c.id === activeChild.id) ??
@@ -696,17 +695,14 @@ export default function WeeklyPlan() {
     setIsGenerating(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(
-        `${API_BASE}/mpasi/generate-weekly/${childData.id}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ custom_budget: parseFloat(budgetMingguan) }),
+      const res = await apiFetch(`/mpasi/generate-weekly/${childData.id}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      );
+        body: JSON.stringify({ custom_budget: parseFloat(budgetMingguan) }),
+      });
       const responseData = await res.json();
       if (!res.ok) throw new Error(responseData.message);
 
@@ -729,7 +725,7 @@ export default function WeeklyPlan() {
     setIsSavingPref(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE}/children/${childData.id}`, {
+      const res = await apiFetch(`/children/${childData.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -755,7 +751,7 @@ export default function WeeklyPlan() {
   const handleExecuteDelete = async () => {
     try {
       const token = localStorage.getItem("token");
-      await fetch(`${API_BASE}/mpasi/weekly/${childData.id}`, {
+      await apiFetch(`/mpasi/weekly/${childData.id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

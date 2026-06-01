@@ -54,12 +54,10 @@ const createChild = async (req, res) => {
           prefNameLower.includes(al.name.toLowerCase()),
         );
         if (clash) {
-          return res
-            .status(400)
-            .json({
-              message: "Validasi Gagal: Data kontradiktif!",
-              details: `Anak alergi terhadap kategori '${clash.name}', sehingga bahan '${pref.name}' dilarang menjadi makanan kesukaan.`,
-            });
+          return res.status(400).json({
+            message: "Validasi Gagal: Data kontradiktif!",
+            details: `Anak alergi terhadap kategori '${clash.name}', sehingga bahan '${pref.name}' dilarang menjadi makanan kesukaan.`,
+          });
         }
       }
     }
@@ -117,7 +115,6 @@ const createChild = async (req, res) => {
 
     const result = await prisma.$transaction(async (tx) => {
       return await tx.child.create({
-        box: { transaction: true },
         data: {
           user_id: userId,
           name,
@@ -164,16 +161,14 @@ const createChild = async (req, res) => {
       });
     });
 
-    res
-      .status(201)
-      .json({
-        message: "Data anak beserta status pertumbuhan disimpan!",
-        calculations: {
-          persentase_gaji: `${budgetInfo.persentase_gaji}%`,
-          budget_bulanan_rekomendasi: Math.round(budgetInfo.optimal_budget),
-        },
-        data: result,
-      });
+    res.status(201).json({
+      message: "Data anak beserta status pertumbuhan disimpan!",
+      calculations: {
+        persentase_gaji: `${budgetInfo.persentase_gaji}%`,
+        budget_bulanan_rekomendasi: Math.round(budgetInfo.optimal_budget),
+      },
+      data: result,
+    });
   } catch (error) {
     res
       .status(500)
@@ -253,12 +248,10 @@ const updateChild = async (req, res) => {
           prefNameLower.includes(al.name.toLowerCase()),
         );
         if (clash)
-          return res
-            .status(400)
-            .json({
-              message: "Validasi Gagal: Data kontradiktif!",
-              details: `Anak alergi terhadap '${clash.name}', '${pref.name}' dilarang.`,
-            });
+          return res.status(400).json({
+            message: "Validasi Gagal: Data kontradiktif!",
+            details: `Anak alergi terhadap '${clash.name}', '${pref.name}' dilarang.`,
+          });
       }
     }
 

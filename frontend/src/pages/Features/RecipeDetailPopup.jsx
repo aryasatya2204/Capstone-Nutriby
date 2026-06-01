@@ -1,6 +1,5 @@
 import { useEffect } from "react";
-
-const IMG_BASE = "http://localhost:3000";
+import { getImageUrl } from "../../config/api.js";
 
 const formatRupiah = (angka) =>
   new Intl.NumberFormat("id-ID", {
@@ -32,7 +31,7 @@ export default function RecipeDetailPopup({ menu, onClose }) {
         <div className="relative h-28 sm:h-44 bg-gray-100 w-full flex-shrink-0 transition-all">
           {menu.image_url ? (
             <img
-              src={`${IMG_BASE}/${menu.image_url}`}
+              src={getImageUrl(menu.image_url)}
               alt={menu.name}
               className="w-full h-full object-cover"
             />

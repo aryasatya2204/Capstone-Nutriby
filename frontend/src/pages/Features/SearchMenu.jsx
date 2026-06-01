@@ -3,9 +3,7 @@ import NavbarDashboard from "../../components/NavbarDashboard";
 import FooterDashboard from "../../components/FooterDashboard";
 import RecipeDetailPopup from "./RecipeDetailPopup";
 import { useAuth } from "../../context/authContext";
-
-const API_BASE = "http://localhost:3000/api";
-const IMG_BASE = "http://localhost:3000";
+import { apiFetch, getImageUrl } from "../../config/api.js";
 
 const formatRupiah = (n) =>
   new Intl.NumberFormat("id-ID", {
@@ -28,7 +26,7 @@ function RecipeCard({ menu, onClick }) {
       <div className="h-44 bg-gray-100 relative overflow-hidden flex-shrink-0">
         {menu.image_url ? (
           <img
-            src={`${IMG_BASE}/${menu.image_url}`}
+            src={getImageUrl(menu.image_url)}
             alt={menu.name}
             crossOrigin="anonymous"
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
@@ -102,8 +100,8 @@ export default function SearchMenu() {
         const headers = { Authorization: `Bearer ${token}` };
 
         const [resAlg, resIng] = await Promise.all([
-          fetch(`${API_BASE}/master/allergies`, { headers }),
-          fetch(`${API_BASE}/master/ingredients`, { headers }),
+          apiFetch("/master/allergies", { headers }),
+          apiFetch("/master/ingredients", { headers }),
         ]);
 
         const algData = await resAlg.json();
@@ -145,7 +143,23 @@ export default function SearchMenu() {
 
           // Sengaja tidak pre-populate results dari cache agar user selalu
           // mendapat hasil segar sesuai filter terbaru saat klik "Cari Menu"
-          setResults([]);
+
+          const cached = sessionStorage.getItem("searchMenuCache");
+          if (cached) {
+            try {
+              const parsed = JSON.parse(cached);
+              if (parsed.childId === activeChild?.id) {
+                setResults(parsed.results);
+              } else {
+                setResults([]);
+                sessionStorage.removeItem("searchMenuCache");
+              }
+            } catch {
+              setResults([]);
+            }
+          } else {
+            setResults([]);
+          }
         }
       } catch (err) {
         console.error("Gagal fetch data:", err);
@@ -255,7 +269,7 @@ export default function SearchMenu() {
         "Content-Type": "application/json",
       };
 
-      await fetch(`${API_BASE}/children/${childData.id}`, {
+      await apiFetch(`/children/${childData.id}`, {
         method: "PUT",
         headers: authHeader,
         body: JSON.stringify({
@@ -265,21 +279,26 @@ export default function SearchMenu() {
       });
 
       const budgetNilai = parseInt(budgetInput.replace(/\./g, ""), 10) || 0;
-      const resSearch = await fetch(
-        `${API_BASE}/mpasi/search-menu/${childData.id}`,
-        {
-          method: "POST",
-          headers: authHeader,
-          body: JSON.stringify({
-            custom_budget: budgetNilai,
-            ingredients: searchIngredients.map((i) => i.name),
-          }),
-        },
-      );
+      const resSearch = await apiFetch(`/mpasi/search-menu/${childData.id}`, {
+        method: "POST",
+        headers: authHeader,
+        body: JSON.stringify({
+          custom_budget: budgetNilai,
+          ingredients: searchIngredients.map((i) => i.name),
+        }),
+      });
 
       const dataSearch = await resSearch.json();
       if (resSearch.ok) {
-        setResults(dataSearch.data || []);
+        const resultData = dataSearch.data || [];
+        setResults(resultData);
+        sessionStorage.setItem(
+          "searchMenuCache",
+          JSON.stringify({
+            childId: childData.id,
+            results: dataSearch.data || [],
+          }),
+        );
       } else {
         setErrorMsg(dataSearch.message || "Gagal mencari menu.");
       }

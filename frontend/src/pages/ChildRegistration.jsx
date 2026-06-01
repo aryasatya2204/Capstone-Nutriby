@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/authContext";
+import { apiFetch } from "../config/api"; // ✅ Import apiFetch
 
 export default function ChildRegistration({ onClose, forcedError }) {
   const navigate = useNavigate();
   const [error, setError] = useState(forcedError || "");
-  const { user } = useAuth();
+  const { user, fetchChildren } = useAuth();
 
   // States
   const [step, setStep] = useState(1);
@@ -56,11 +57,12 @@ export default function ChildRegistration({ onClose, forcedError }) {
     const fetchMasterData = async () => {
       const token = localStorage.getItem("token");
       try {
+        // ✅ PERBAIKAN: Pakai apiFetch, bukan fetch ke localhost
         const [resAllergy, resIngred] = await Promise.all([
-          fetch("http://localhost:3000/api/master/allergies", {
+          apiFetch("/master/allergies", {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch("http://localhost:3000/api/master/ingredients", {
+          apiFetch("/master/ingredients", {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
@@ -105,13 +107,11 @@ export default function ChildRegistration({ onClose, forcedError }) {
     let val = e.target.value;
     val = val.replace(",", "."); // Ubah koma jadi titik agar seragam
 
-   
     if (val === "" || /^\d*\.?\d{0,1}$/.test(val)) {
       setFormData({ ...formData, [e.target.name]: val });
       setError("");
     }
   };
-
 
   const handleSalaryChange = (e) => {
     const rawValue = e.target.value.replace(/\D/g, "");
@@ -246,7 +246,8 @@ export default function ChildRegistration({ onClose, forcedError }) {
       // Hapus titik dari string gaji sebelum dikirim ke backend
       const cleanSalary = formData.parent_salary.replace(/\./g, "");
 
-      const childRes = await fetch("http://localhost:3000/api/children", {
+      // ✅ PERBAIKAN: Pakai apiFetch, bukan fetch ke localhost
+      const childRes = await apiFetch("/children", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -268,9 +269,9 @@ export default function ChildRegistration({ onClose, forcedError }) {
       const newChildId = childData.data.id;
       setChildGlobalStatus(childData.data.growth_logs[0].global_status);
 
-      // Hit AI API Mealplan
-      const insightRes = await fetch(
-        `http://localhost:3000/api/mealplan/generate-insight/${newChildId}`,
+      // ✅ PERBAIKAN: Pakai apiFetch, bukan fetch ke localhost
+      const insightRes = await apiFetch(
+        `/mealplan/generate-insight/${newChildId}`,
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
@@ -701,7 +702,6 @@ export default function ChildRegistration({ onClose, forcedError }) {
                 Catatan dari NutriBot:
               </h3>
               <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-700 italic border border-gray-200 whitespace-pre-wrap leading-relaxed shadow-sm">
-                {/* BUG #3 FIX: insightData adalah objek MealPlan, bukan string. Ambil ai_insight_text */}
                 {insightData?.ai_insight_text ? (
                   insightData.ai_insight_text.split("\n\n").map((para, i) => (
                     <p key={i} className="mb-2 last:mb-0">
@@ -717,7 +717,8 @@ export default function ChildRegistration({ onClose, forcedError }) {
             </div>
 
             <button
-              onClick={() => {
+              onClick={async () => {
+                await fetchChildren();
                 if (onClose) onClose();
                 navigate("/dashboard");
               }}

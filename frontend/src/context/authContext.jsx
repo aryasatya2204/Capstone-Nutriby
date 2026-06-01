@@ -6,7 +6,8 @@ import {
   useCallback,
 } from "react";
 
-const API_BASE = "http://localhost:3000/api";
+import { apiFetch } from "../config/api.js";
+
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
@@ -32,12 +33,13 @@ export function AuthProvider({ children }) {
     const token = localStorage.getItem("token");
     if (!token) return;
     try {
-      const res = await fetch(`${API_BASE}/children`, {
+      const res = await apiFetch("/children", {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return;
       const data = await res.json();
       const list = Array.isArray(data) ? data : [];
+      console.log("fetchChildren result:", list);
       setChildrenList(list);
 
       // set anak yang aktif
@@ -75,6 +77,7 @@ export function AuthProvider({ children }) {
   // fungsi auth login logout
   const login = (userData) => {
     setUser(userData);
+    localStorage.setItem("user", JSON.stringify(userData)); // tambah ini
   };
 
   const logout = () => {

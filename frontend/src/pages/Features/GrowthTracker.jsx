@@ -4,8 +4,8 @@ import { generatePDF } from "../../helpers/pdfHelper";
 import NavbarDashboard from "../../components/NavbarDashboard";
 import FooterDashboard from "../../components/FooterDashboard";
 import { useAuth } from "../../context/authContext";
+import { apiFetch } from "../../config/api.js";
 
-const API_BASE = "http://localhost:3000/api";
 const COOLDOWN_DAYS = 7;
 const COOLDOWN_MS = COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
 
@@ -322,7 +322,7 @@ export default function GrowthTracker() {
         if (!child) return;
         setChildData(child);
 
-        const chartRes = await fetch(`${API_BASE}/growth/${child.id}/chart`, {
+        const chartRes = await apiFetch(`/growth/${child.id}/chart`, {
           headers,
         });
         const chartJson = await chartRes.json();
@@ -356,7 +356,7 @@ export default function GrowthTracker() {
     try {
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`${API_BASE}/growth/${childData.id}/log`, {
+      const res = await apiFetch(`/growth/${childData.id}/log`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -374,7 +374,7 @@ export default function GrowthTracker() {
 
       await fetchChildren();
       const token2 = localStorage.getItem("token");
-      const childRes = await fetch(`${API_BASE}/children`, {
+      const childRes = await apiFetch(`/children`, {
         headers: { Authorization: `Bearer ${token2}` },
       });
       const allChildren = await childRes.json();
@@ -393,7 +393,7 @@ export default function GrowthTracker() {
       setTinggiInput("");
 
       const headers = { Authorization: `Bearer ${token}` };
-      const chartRes = await fetch(`${API_BASE}/growth/${childData.id}/chart`, {
+      const chartRes = await apiFetch(`/growth/${childData.id}/chart`, {
         headers,
       });
       const chartJson = await chartRes.json();
