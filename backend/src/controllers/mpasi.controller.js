@@ -246,7 +246,10 @@ const searchMenuByIngredient = async (req, res) => {
     const { childId } = req.params;
     const { custom_budget, ingredients } = req.body;
 
-    const ingredientList = Array.isArray(ingredients) ? ingredients : [];
+    if (ingredientList.length === 0)
+      return res
+        .status(400)
+        .json({ message: "Minimal satu bahan pencarian harus dipilih." });
 
     const childBase = await prisma.child.findUnique({
       where: { id: childId },
