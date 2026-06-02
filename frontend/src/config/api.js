@@ -1,5 +1,5 @@
 // Default to production URL if env is missing
-const BASE_URL = import.meta.env.VITE_API_URL || 'https://nutriby.user.cloudjkt02.com';
+const BASE_URL = import.meta.env.VITE_API_URL;
 
 // Add the /api prefix
 export const API_BASE_URL = `${BASE_URL}/api`;
