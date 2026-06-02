@@ -297,13 +297,36 @@ export default function Nutribot() {
     }
   };
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => { 
     e.preventDefault();
     if (isSending) {
       showSpamWarning();
       return;
     }
-    submitMessage(inputMessage, activeSession);
+    
+    if (!inputMessage.trim()) return;
+
+    let targetSession = activeSession;
+
+    if (!targetSession) {
+      // Buat sesi baru ke Backend
+      targetSession = await handleCreateNewSession(activeTab, false);
+      setActiveSession(targetSession);
+      
+      // Munculkan sapaan bot pertama kali agar UI rapi
+      setMessages([
+        {
+          sender: "bot",
+          text: `Halo Bunda/Ayah! Saya NutriBot. Saat ini kita berada di mode **${activeTab === "personal" ? "Personal" : "Reguler"}**. Ada yang bisa saya bantu terkait gizi atau tumbuh kembang si kecil?`,
+          isNew: false,
+        },
+      ]);
+    }
+
+    // Setelah sesi dipastikan ada, baru kirim pesan inputannya
+    if (targetSession) {
+      submitMessage(inputMessage, targetSession);
+    }
   };
 
   // Handler Klik Pertanyaan Rekomendasi
