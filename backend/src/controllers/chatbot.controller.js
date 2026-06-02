@@ -57,11 +57,10 @@ const sendMessage = async (req, res) => {
     });
 
     if (!session || session.child.user_id !== userId) {
-      return res
-        .status(404)
-        .json({ message: "Sesi tidak ditemukan atau akses ditolak." });
+      return res.status(404).json({ message: "Sesi tidak ditemukan atau akses ditolak." });
     }
 
+    // Validasi Limit
     if (session.message_count >= 5 || !session.is_active) {
       if (session.is_active) {
         await prisma.botSession.update({
@@ -69,12 +68,9 @@ const sendMessage = async (req, res) => {
           data: { is_active: false },
         });
       }
-      return res
-        .status(403)
-        .json({
-          message:
-            "Sesi ini telah mencapai batas 5 pertanyaan. Silakan buka sesi baru.",
-        });
+      return res.status(403).json({
+        message: "Sesi ini telah mencapai batas maksimal 5 pertanyaan untuk menjaga konteks. Silakan buka konsultasi baru.",
+      });
     }
 
     let sessionTitle = session.title;
@@ -99,20 +95,13 @@ const sendMessage = async (req, res) => {
           gender: fullChildProfile.gender,
           ageInMonths: getAgeInMonths(fullChildProfile.dob),
           latestLog: fullChildProfile.growth_logs[0],
-          allergies: fullChildProfile.allergies.map(
-            (a) => a.allergy_category.name,
-          ),
-          preferences: fullChildProfile.preferences.map(
-            (p) => p.ingredient.name,
-          ),
+          allergies: fullChildProfile.allergies.map((a) => a.allergy_category.name),
+          preferences: fullChildProfile.preferences.map((p) => p.ingredient.name),
         };
       }
     }
 
-    const systemInstruction = generateSystemInstruction(
-      session.mode,
-      childData,
-    );
+    const systemInstruction = generateSystemInstruction(session.mode, childData);
     const chatHistory = await prisma.botMessage.findMany({
       where: { session_id },
       orderBy: { created_at: "asc" },
@@ -131,11 +120,7 @@ const sendMessage = async (req, res) => {
       }),
     ]);
 
-    const aiResponse = await generateChatResponse(
-      systemInstruction,
-      chatHistory,
-      message,
-    );
+    const aiResponse = await generateChatResponse(systemInstruction, chatHistory, message);
 
     const savedBotMessage = await prisma.botMessage.create({
       data: { session_id, sender: "bot", message: aiResponse },
@@ -147,9 +132,7 @@ const sendMessage = async (req, res) => {
     });
   } catch (error) {
     console.error("Chatbot Error:", error);
-    res
-      .status(500)
-      .json({ message: "Gagal memproses pesan", error: error.message });
+    res.status(500).json({ message: "AI sedang sibuk atau terjadi gangguan. Silakan coba lagi.", error: error.message });
   }
 };
 
