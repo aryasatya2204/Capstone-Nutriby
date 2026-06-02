@@ -19,3 +19,5 @@ env/
 
 # (Penting) Mengabaikan file environment variables!
 .env
+.env.development
+.env.production
